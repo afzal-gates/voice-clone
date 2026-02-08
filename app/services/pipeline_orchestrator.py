@@ -337,6 +337,8 @@ class PipelineOrchestrator:
         ref_audio_path: Path | None = None,
         speed: float = 1.0,
         pitch: float = 1.0,
+        language: str | None = None,
+        tts_model: str | None = None,
     ) -> Path:
         """Run a simple text-to-speech synthesis without the full pipeline.
 
@@ -346,6 +348,10 @@ class PipelineOrchestrator:
             ref_audio_path: Optional reference audio for voice cloning.
             speed:          Playback speed multiplier.
             pitch:          Pitch shift multiplier.
+            language:       Explicit language (e.g. "English", "Bengali").
+                            ``None`` for auto-detection.
+            tts_model:      TTS model identifier (e.g. "qwen3-tts", "mms-tts-ben").
+                            ``None`` defaults to Qwen3-TTS.
 
         Returns:
             Path to the generated audio file.
@@ -353,6 +359,8 @@ class PipelineOrchestrator:
         Raises:
             Exception: Re-raised after marking the job as ``FAILED``.
         """
+        from app.pipeline.tts_engine import MODEL_QWEN
+
         try:
             job_dir = self.job_manager.get_job_dir(job_id)
             output_dir = job_dir / "output"
@@ -366,13 +374,16 @@ class PipelineOrchestrator:
                 progress=0.30,
             )
 
-            logger.info("Job %s: synthesising TTS (%d chars)", job_id, len(text))
+            model = tts_model if tts_model else MODEL_QWEN
+            logger.info("Job %s: synthesising TTS (%d chars, model=%s)", job_id, len(text), model)
             await self.tts_engine.synthesize(
                 text=text,
                 output_path=output_path,
                 reference_audio=ref_audio_path,
                 speed=speed,
                 pitch=pitch,
+                language=language,
+                tts_model=model,
             )
 
             # Export to MP3 as well.

@@ -81,6 +81,18 @@ class Speaker(BaseModel):
     assigned_voice_ref: Optional[str] = None
 
 
+class VoiceProfile(BaseModel):
+    """A saved voice profile for reuse across jobs and TTS sessions."""
+
+    voice_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    name: str
+    description: str = ""
+    audio_filename: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    sample_rate: int = 0
+    duration: float = 0.0
+
+
 class JobInfo(BaseModel):
     """Complete state representation of a voice-clone job.
 
@@ -133,14 +145,13 @@ class TTSRequest(BaseModel):
 class VoiceAssignment(BaseModel):
     """Maps a detected speaker to a reference voice audio file.
 
-    Attributes:
-        speaker_id: The speaker identifier from diarization output.
-        reference_audio_filename: Filename of the uploaded reference audio
-            stored in the job's directory.
+    Either ``reference_audio_filename`` or ``voice_id`` must be provided.
+    When ``voice_id`` is set, the saved voice profile's audio is used.
     """
 
     speaker_id: str
-    reference_audio_filename: str
+    reference_audio_filename: str = ""
+    voice_id: Optional[str] = None
 
 
 class VoiceAssignmentRequest(BaseModel):
@@ -212,3 +223,15 @@ class TTSResponse(BaseModel):
     job_id: str
     status: str
     output_file: Optional[str] = None
+
+
+class VoiceProfileResponse(BaseModel):
+    """Response model for voice profile API endpoints."""
+
+    voice_id: str
+    name: str
+    description: str = ""
+    audio_filename: str = ""
+    created_at: datetime
+    sample_rate: int = 0
+    duration: float = 0.0

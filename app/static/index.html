@@ -692,6 +692,17 @@ input:focus, textarea:focus, select:focus {
   gap: 1.25rem;
 }
 
+.model-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted, #888);
+  margin-top: 0.125rem;
+}
+
+.form-group.model-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .form-group {
   display: grid;
   gap: 0.375rem;
@@ -1128,6 +1139,103 @@ input[type="range"]::-moz-range-thumb {
     padding: 2rem 1rem;
   }
 }
+
+/* ============================================================
+   Voice Library
+   ============================================================ */
+.voice-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.voice-select-wrapper select {
+  flex: 1;
+  min-width: 0;
+}
+
+.voice-or-divider {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.25rem 0;
+}
+
+.voice-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.voice-save-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.speaker-voice-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.speaker-voice-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.voice-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.voice-preview-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.voice-preview-btn.playing {
+  color: var(--error);
+  border-color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.voice-preview-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.speaker-voice-or {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
 </style>
 </head>
 <body>
@@ -1286,16 +1394,48 @@ input[type="range"]::-moz-range-thumb {
               <textarea id="ttsText" placeholder="Enter text to synthesize..." rows="6"></textarea>
             </div>
 
-            <div class="form-group">
-              <label>Reference Voice (optional)</label>
+            <div class="form-group" id="ttsVoiceGroup">
+              <label>Reference Voice (optional — Qwen3-TTS only)</label>
+              <div class="voice-select-wrapper">
+                <select id="ttsVoiceSelect" aria-label="Select a saved voice">
+                  <option value="">-- No saved voice --</option>
+                </select>
+                <button class="voice-preview-btn" id="ttsVoicePreviewBtn" type="button" title="Preview voice" disabled aria-label="Preview selected voice">
+                  <svg class="preview-play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  <svg class="preview-stop-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                </button>
+              </div>
+              <div class="voice-or-divider">or upload new</div>
               <div class="tts-ref-upload">
                 <button class="btn btn-secondary btn-sm" id="ttsRefBtn" type="button">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   Upload voice sample
                 </button>
                 <span class="ref-filename" id="ttsRefName"></span>
+                <button class="voice-save-btn hidden" id="ttsSaveVoiceBtn" type="button" title="Save uploaded voice to library">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Save as Voice
+                </button>
                 <input type="file" id="ttsRefInput" accept=".wav,.mp3" class="hidden" aria-label="Upload reference voice">
               </div>
+            </div>
+
+            <div class="form-group">
+              <label for="ttsModelSelect">TTS Model</label>
+              <select id="ttsModelSelect" aria-label="Select TTS model">
+                <option value="qwen3-tts">Qwen3-TTS (Multilingual + Voice Cloning)</option>
+                <option value="mms-tts-ben">Meta MMS-TTS Bengali</option>
+              </select>
+              <small class="model-hint" id="ttsModelHint"></small>
+            </div>
+
+            <div class="form-group">
+              <label for="ttsLanguage">Language</label>
+              <select id="ttsLanguage" aria-label="Select language for synthesis">
+                <option value="auto">Auto-detect</option>
+                <option value="English">English</option>
+                <option value="Bengali">Bangla (Bengali)</option>
+              </select>
             </div>
 
             <div class="slider-row">
@@ -1408,6 +1548,10 @@ input[type="range"]::-moz-range-thumb {
     ttsRefFile: null,
     speakerRefs: {},  // speaker_id -> filename
     jobs: [],
+    voices: [],              // cached voice profiles from API
+    ttsSelectedVoiceId: null, // currently selected voice for TTS
+    previewAudio: null,      // Audio object for voice preview playback
+    previewingBtn: null,     // currently active preview button element
   };
 
   /* -----------------------------------------------
@@ -1453,6 +1597,10 @@ input[type="range"]::-moz-range-thumb {
     ttsRefBtn:       $('#ttsRefBtn'),
     ttsRefInput:     $('#ttsRefInput'),
     ttsRefName:      $('#ttsRefName'),
+    ttsModelSelect:  $('#ttsModelSelect'),
+    ttsModelHint:    $('#ttsModelHint'),
+    ttsVoiceGroup:   null, // set after DOM ready
+    ttsLanguage:     $('#ttsLanguage'),
     ttsSpeed:        $('#ttsSpeed'),
     ttsSpeedVal:     $('#ttsSpeedVal'),
     ttsPitch:        $('#ttsPitch'),
@@ -1462,6 +1610,9 @@ input[type="range"]::-moz-range-thumb {
     ttsStatusText:   $('#ttsStatusText'),
     ttsResultCard:   $('#ttsResultCard'),
     ttsResultAudio:  $('#ttsResultAudio'),
+    ttsVoiceSelect:  $('#ttsVoiceSelect'),
+    ttsVoicePreviewBtn: $('#ttsVoicePreviewBtn'),
+    ttsSaveVoiceBtn: $('#ttsSaveVoiceBtn'),
     ttsDownloadGroup:$('#ttsDownloadGroup'),
     ttsNewBtn:       $('#ttsNewBtn'),
     sidebar:         $('#sidebar'),
@@ -1897,12 +2048,23 @@ input[type="range"]::-moz-range-thumb {
               </div>
             `).join('')}
           </div>` : ''}
+          <div class="speaker-voice-row">
+            <select class="spk-voice-select" data-speaker-id="${sp.speaker_id}" aria-label="Select saved voice for ${label}">
+              <option value="">-- Select saved voice --</option>
+            </select>
+            <button class="voice-preview-btn spk-voice-preview" data-speaker-id="${sp.speaker_id}" type="button" title="Preview voice" disabled aria-label="Preview selected voice">
+              <svg class="preview-play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <svg class="preview-stop-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            </button>
+          </div>
+          <div class="speaker-voice-or">or upload file</div>
           <div class="speaker-upload-row">
             <button class="btn btn-secondary btn-sm spk-upload-btn" data-speaker-id="${sp.speaker_id}">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Upload Reference Voice
             </button>
             <span class="ref-filename" id="refName_${sp.speaker_id}">${hasRef ? sp.assigned_voice_ref : ''}</span>
+            <button class="voice-save-btn spk-save-voice-btn ${hasRef ? '' : 'hidden'}" data-speaker-id="${sp.speaker_id}" type="button" title="Save to voice library">Save</button>
             <input type="file" class="hidden spk-file-input" data-speaker-id="${sp.speaker_id}" accept=".wav,.mp3" aria-label="Upload reference voice for ${label}">
           </div>
         </div>`;
@@ -1931,10 +2093,63 @@ input[type="range"]::-moz-range-thumb {
     dom.speakerCards.querySelectorAll('.spk-file-input').forEach(input => {
       input.addEventListener('change', () => {
         if (input.files.length > 0) {
+          // Clear the voice dropdown for this speaker when uploading a file
+          const voiceSel = dom.speakerCards.querySelector(`.spk-voice-select[data-speaker-id="${input.dataset.speakerId}"]`);
+          if (voiceSel) voiceSel.value = '';
+          // Disable preview button and stop any playing preview
+          const previewBtn = dom.speakerCards.querySelector(`.spk-voice-preview[data-speaker-id="${input.dataset.speakerId}"]`);
+          if (previewBtn) previewBtn.disabled = true;
+          stopVoicePreview();
           uploadReferenceVoice(input.dataset.speakerId, input.files[0]);
         }
       });
     });
+
+    // Bind voice dropdown changes
+    dom.speakerCards.querySelectorAll('.spk-voice-select').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const spkId = sel.dataset.speakerId;
+        const card = document.getElementById('spkCard_' + spkId);
+        const saveBtn = dom.speakerCards.querySelector(`.spk-save-voice-btn[data-speaker-id="${spkId}"]`);
+        const previewBtn = dom.speakerCards.querySelector(`.spk-voice-preview[data-speaker-id="${spkId}"]`);
+        stopVoicePreview();
+        if (sel.value) {
+          // Voice selected from library - mark as assigned, clear file ref
+          if (card) card.classList.add('assigned');
+          state.speakerRefs[spkId] = '__voice__' + sel.value; // sentinel to track voice_id assignment
+          if (saveBtn) saveBtn.classList.add('hidden');
+        } else {
+          // Cleared voice selection - unmark unless file was uploaded
+          if (!state.speakerRefs[spkId] || state.speakerRefs[spkId].startsWith('__voice__')) {
+            if (card) card.classList.remove('assigned');
+            delete state.speakerRefs[spkId];
+          }
+        }
+        // Enable/disable preview button based on selection
+        if (previewBtn) previewBtn.disabled = !sel.value;
+        updateStartReplacementBtn();
+      });
+    });
+
+    // Bind speaker card voice preview buttons
+    dom.speakerCards.querySelectorAll('.spk-voice-preview').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const spkId = btn.dataset.speakerId;
+        const sel = dom.speakerCards.querySelector(`.spk-voice-select[data-speaker-id="${spkId}"]`);
+        const voiceId = sel ? sel.value : '';
+        if (voiceId) toggleVoicePreview(voiceId, btn);
+      });
+    });
+
+    // Bind save-to-library buttons on speaker cards
+    dom.speakerCards.querySelectorAll('.spk-save-voice-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        saveVoiceFromJob(btn.dataset.speakerId);
+      });
+    });
+
+    // Populate voice dropdowns with existing voices
+    populateVoiceSelectors();
 
     updateStartReplacementBtn();
   }
@@ -1943,6 +2158,132 @@ input[type="range"]::-moz-range-thumb {
     const el = document.createElement('span');
     el.textContent = str;
     return el.innerHTML;
+  }
+
+  /* -----------------------------------------------
+     Voice Library
+     ----------------------------------------------- */
+  async function loadVoices() {
+    try {
+      const voices = await apiJSON('/api/voices');
+      state.voices = Array.isArray(voices) ? voices : [];
+      populateVoiceSelectors();
+    } catch { state.voices = []; }
+  }
+
+  function populateVoiceSelectors() {
+    // Update TTS voice dropdown
+    const sel = dom.ttsVoiceSelect;
+    if (sel) {
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">-- No saved voice --</option>' +
+        state.voices.map(v =>
+          `<option value="${v.voice_id}">${escapeHtml(v.name)} (${v.duration ? v.duration.toFixed(1) + 's' : '?'})</option>`
+        ).join('');
+      sel.value = cur;
+    }
+    // Update speaker assignment dropdowns
+    document.querySelectorAll('.spk-voice-select').forEach(s => {
+      const cur = s.value;
+      s.innerHTML = '<option value="">-- Select saved voice --</option>' +
+        state.voices.map(v =>
+          `<option value="${v.voice_id}">${escapeHtml(v.name)} (${v.duration ? v.duration.toFixed(1) + 's' : '?'})</option>`
+        ).join('');
+      s.value = cur;
+    });
+  }
+
+  async function saveVoiceFromUpload() {
+    if (!state.ttsRefFile) return;
+    const name = prompt('Enter a name for this voice:');
+    if (!name) return;
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('audio', state.ttsRefFile);
+    try {
+      await apiJSON('/api/voices', { method: 'POST', body: fd });
+      showToast('success', 'Voice saved', 'Added to voice library.');
+      loadVoices();
+    } catch (err) { showToast('error', 'Save failed', err.message); }
+  }
+
+  async function saveVoiceFromJob(speakerId) {
+    if (!state.currentJobId) return;
+    const name = prompt('Enter a name for this voice:');
+    if (!name) return;
+    const fd = new FormData();
+    fd.append('speaker_id', speakerId);
+    fd.append('name', name);
+    try {
+      await apiJSON('/api/voices/from-job/' + state.currentJobId, { method: 'POST', body: fd });
+      showToast('success', 'Voice saved', 'Added to voice library.');
+      loadVoices();
+    } catch (err) { showToast('error', 'Save failed', err.message); }
+  }
+
+  async function deleteVoice(voiceId) {
+    if (!confirm('Delete this voice profile?')) return;
+    try {
+      await apiFetch('/api/voices/' + voiceId, { method: 'DELETE' });
+      showToast('success', 'Deleted', 'Voice removed.');
+      loadVoices();
+    } catch (err) { showToast('error', 'Delete failed', err.message); }
+  }
+
+  /* -----------------------------------------------
+     Voice Preview (Play / Stop)
+     ----------------------------------------------- */
+  function stopVoicePreview() {
+    if (state.previewAudio) {
+      state.previewAudio.pause();
+      state.previewAudio.src = '';
+      state.previewAudio = null;
+    }
+    if (state.previewingBtn) {
+      setPreviewBtnState(state.previewingBtn, false);
+      state.previewingBtn = null;
+    }
+  }
+
+  function setPreviewBtnState(btn, playing) {
+    const playIcon = btn.querySelector('.preview-play-icon');
+    const stopIcon = btn.querySelector('.preview-stop-icon');
+    if (playing) {
+      btn.classList.add('playing');
+      if (playIcon) playIcon.style.display = 'none';
+      if (stopIcon) stopIcon.style.display = '';
+    } else {
+      btn.classList.remove('playing');
+      if (playIcon) playIcon.style.display = '';
+      if (stopIcon) stopIcon.style.display = 'none';
+    }
+  }
+
+  function toggleVoicePreview(voiceId, btn) {
+    // If already playing this voice, stop it
+    if (state.previewAudio && state.previewingBtn === btn) {
+      stopVoicePreview();
+      return;
+    }
+    // Stop any existing preview first
+    stopVoicePreview();
+    if (!voiceId) return;
+
+    const audio = new Audio('/api/voices/' + voiceId + '/audio');
+    state.previewAudio = audio;
+    state.previewingBtn = btn;
+    setPreviewBtnState(btn, true);
+
+    audio.addEventListener('ended', () => {
+      stopVoicePreview();
+    });
+    audio.addEventListener('error', () => {
+      showToast('error', 'Preview failed', 'Could not load voice audio.');
+      stopVoicePreview();
+    });
+    audio.play().catch(() => {
+      stopVoicePreview();
+    });
   }
 
   async function uploadReferenceVoice(speakerId, file) {
@@ -1966,6 +2307,9 @@ input[type="range"]::-moz-range-thumb {
       if (card) card.classList.add('assigned');
       const refName = document.getElementById('refName_' + speakerId);
       if (refName) refName.textContent = data.filename || file.name;
+      // Show save-to-library button
+      const saveBtn = dom.speakerCards.querySelector(`.spk-save-voice-btn[data-speaker-id="${speakerId}"]`);
+      if (saveBtn) saveBtn.classList.remove('hidden');
 
       showToast('success', 'Reference uploaded', 'Voice reference for speaker assigned.');
     } catch (err) {
@@ -1979,16 +2323,28 @@ input[type="range"]::-moz-range-thumb {
 
   function updateStartReplacementBtn() {
     const speakers = (state.currentJobData && state.currentJobData.speakers) || [];
-    const allAssigned = speakers.length > 0 && speakers.every(sp => state.speakerRefs[sp.speaker_id]);
+    const allAssigned = speakers.length > 0 && speakers.every(sp => {
+      // Check if a voice is selected from the dropdown OR a file was uploaded
+      const voiceSelect = document.querySelector(`.spk-voice-select[data-speaker-id="${sp.speaker_id}"]`);
+      const hasVoiceSelected = voiceSelect && voiceSelect.value;
+      const ref = state.speakerRefs[sp.speaker_id] || '';
+      const hasFileRef = ref && !ref.startsWith('__voice__');
+      return hasVoiceSelected || hasFileRef;
+    });
     dom.startReplacementBtn.disabled = !allAssigned;
   }
 
   async function handleStartReplacement() {
     const speakers = (state.currentJobData && state.currentJobData.speakers) || [];
-    const assignments = speakers.map(sp => ({
-      speaker_id: sp.speaker_id,
-      reference_audio_filename: state.speakerRefs[sp.speaker_id] || '',
-    }));
+    const assignments = speakers.map(sp => {
+      const voiceSelect = document.querySelector(`.spk-voice-select[data-speaker-id="${sp.speaker_id}"]`);
+      const selectedVoiceId = voiceSelect ? voiceSelect.value : '';
+      return {
+        speaker_id: sp.speaker_id,
+        reference_audio_filename: selectedVoiceId ? '' : (state.speakerRefs[sp.speaker_id] || ''),
+        voice_id: selectedVoiceId || null,
+      };
+    });
 
     dom.startReplacementBtn.disabled = true;
     dom.startReplacementBtn.innerHTML = '<span class="spinner"></span> Starting...';
@@ -2072,6 +2428,9 @@ input[type="range"]::-moz-range-thumb {
      Text to Speech
      ----------------------------------------------- */
   function initTTS() {
+    // Resolve voice group ref
+    dom.ttsVoiceGroup = $('#ttsVoiceGroup');
+
     dom.ttsSpeed.addEventListener('input', () => {
       dom.ttsSpeedVal.textContent = parseFloat(dom.ttsSpeed.value).toFixed(1) + 'x';
     });
@@ -2086,10 +2445,96 @@ input[type="range"]::-moz-range-thumb {
       if (dom.ttsRefInput.files.length > 0) {
         state.ttsRefFile = dom.ttsRefInput.files[0];
         dom.ttsRefName.textContent = state.ttsRefFile.name;
+        // Clear voice dropdown when file is uploaded (mutual exclusion)
+        if (dom.ttsVoiceSelect) dom.ttsVoiceSelect.value = '';
+        // Disable preview button and stop any playing preview
+        if (dom.ttsVoicePreviewBtn) dom.ttsVoicePreviewBtn.disabled = true;
+        stopVoicePreview();
+        // Show save-as-voice button
+        if (dom.ttsSaveVoiceBtn) dom.ttsSaveVoiceBtn.classList.remove('hidden');
       }
     });
+
+    // Voice select mutual exclusion: clear file when voice is selected
+    if (dom.ttsVoiceSelect) {
+      dom.ttsVoiceSelect.addEventListener('change', () => {
+        stopVoicePreview();
+        if (dom.ttsVoiceSelect.value) {
+          state.ttsRefFile = null;
+          dom.ttsRefInput.value = '';
+          dom.ttsRefName.textContent = '';
+          if (dom.ttsSaveVoiceBtn) dom.ttsSaveVoiceBtn.classList.add('hidden');
+        }
+        // Enable/disable preview button based on selection
+        if (dom.ttsVoicePreviewBtn) {
+          dom.ttsVoicePreviewBtn.disabled = !dom.ttsVoiceSelect.value;
+        }
+      });
+    }
+
+    // TTS voice preview button
+    if (dom.ttsVoicePreviewBtn) {
+      dom.ttsVoicePreviewBtn.addEventListener('click', () => {
+        const voiceId = dom.ttsVoiceSelect ? dom.ttsVoiceSelect.value : '';
+        if (voiceId) toggleVoicePreview(voiceId, dom.ttsVoicePreviewBtn);
+      });
+    }
+
+    // Save voice from upload button
+    if (dom.ttsSaveVoiceBtn) {
+      dom.ttsSaveVoiceBtn.addEventListener('click', saveVoiceFromUpload);
+    }
+
+    // Model selector — show/hide voice cloning section based on model
+    if (dom.ttsModelSelect) {
+      dom.ttsModelSelect.addEventListener('change', handleModelChange);
+      handleModelChange(); // set initial state
+    }
+
     dom.ttsGenerateBtn.addEventListener('click', handleTTSGenerate);
     dom.ttsNewBtn.addEventListener('click', resetTTS);
+  }
+
+  function handleModelChange() {
+    const model = dom.ttsModelSelect ? dom.ttsModelSelect.value : 'qwen3-tts';
+    const isMMS = model === 'mms-tts-ben';
+
+    // Voice cloning section: hide for MMS (no cloning support)
+    if (dom.ttsVoiceGroup) {
+      if (isMMS) {
+        dom.ttsVoiceGroup.classList.add('model-disabled');
+      } else {
+        dom.ttsVoiceGroup.classList.remove('model-disabled');
+      }
+    }
+
+    // Language selector: MMS only supports Bengali, auto-set it
+    if (dom.ttsLanguage) {
+      if (isMMS) {
+        dom.ttsLanguage.value = 'Bengali';
+        dom.ttsLanguage.disabled = true;
+      } else {
+        dom.ttsLanguage.disabled = false;
+      }
+    }
+
+    // Update hint text
+    if (dom.ttsModelHint) {
+      dom.ttsModelHint.textContent = isMMS
+        ? 'Bengali only. Voice cloning not supported.'
+        : 'Supports English, Bengali, Chinese, Japanese, Korean + voice cloning.';
+    }
+
+    // Clear voice ref if switching to MMS
+    if (isMMS) {
+      state.ttsRefFile = null;
+      if (dom.ttsRefInput) dom.ttsRefInput.value = '';
+      if (dom.ttsRefName) dom.ttsRefName.textContent = '';
+      if (dom.ttsVoiceSelect) dom.ttsVoiceSelect.value = '';
+      if (dom.ttsVoicePreviewBtn) dom.ttsVoicePreviewBtn.disabled = true;
+      if (dom.ttsSaveVoiceBtn) dom.ttsSaveVoiceBtn.classList.add('hidden');
+      stopVoicePreview();
+    }
   }
 
   async function handleTTSGenerate() {
@@ -2105,8 +2550,18 @@ input[type="range"]::-moz-range-thumb {
     formData.append('text', text);
     formData.append('speed', dom.ttsSpeed.value);
     formData.append('pitch', dom.ttsPitch.value);
-    if (state.ttsRefFile) {
-      formData.append('reference_audio', state.ttsRefFile);
+    const lang = dom.ttsLanguage ? dom.ttsLanguage.value : 'auto';
+    formData.append('language', lang);
+    const selectedModel = dom.ttsModelSelect ? dom.ttsModelSelect.value : 'qwen3-tts';
+    formData.append('tts_model', selectedModel);
+    const selectedVoiceId = dom.ttsVoiceSelect ? dom.ttsVoiceSelect.value : '';
+    // Only include voice reference for models that support cloning
+    if (selectedModel !== 'mms-tts-ben') {
+      if (selectedVoiceId) {
+        formData.append('voice_id', selectedVoiceId);
+      } else if (state.ttsRefFile) {
+        formData.append('reference_audio', state.ttsRefFile);
+      }
     }
 
     try {
@@ -2182,11 +2637,18 @@ input[type="range"]::-moz-range-thumb {
 
   function resetTTS() {
     stopTTSPolling();
+    stopVoicePreview();
     state.ttsJobId = null;
     state.ttsRefFile = null;
     dom.ttsText.value = '';
     dom.ttsRefInput.value = '';
     dom.ttsRefName.textContent = '';
+    if (dom.ttsVoiceSelect) dom.ttsVoiceSelect.value = '';
+    if (dom.ttsVoicePreviewBtn) dom.ttsVoicePreviewBtn.disabled = true;
+    if (dom.ttsSaveVoiceBtn) dom.ttsSaveVoiceBtn.classList.add('hidden');
+    if (dom.ttsModelSelect) dom.ttsModelSelect.value = 'qwen3-tts';
+    if (dom.ttsLanguage) { dom.ttsLanguage.value = 'auto'; dom.ttsLanguage.disabled = false; }
+    handleModelChange();
     dom.ttsSpeed.value = '1.0';
     dom.ttsSpeedVal.textContent = '1.0x';
     dom.ttsPitch.value = '1.0';
@@ -2349,8 +2811,9 @@ input[type="range"]::-moz-range-thumb {
     checkHealth();
     setInterval(checkHealth, 15000);
 
-    // Load existing jobs
+    // Load existing jobs and voices
     refreshJobs();
+    loadVoices();
   }
 
   if (document.readyState === 'loading') {

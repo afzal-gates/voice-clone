@@ -67,6 +67,7 @@ class Settings:
 
         # --- TTS ---
         self.QWEN_TTS_MODEL: str = os.getenv("QWEN_TTS_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-Base")
+        self.MMS_TTS_MODEL: str = os.getenv("MMS_TTS_MODEL", "facebook/mms-tts-ben")
 
         # --- Diarization ---
         self.PYANNOTE_MODEL: str = os.getenv(
@@ -90,6 +91,7 @@ class Settings:
         # --- Derived paths ---
         self.UPLOADS_DIR: Path = self.STORAGE_DIR / "uploads"
         self.JOBS_DIR: Path = self.STORAGE_DIR / "jobs"
+        self.VOICES_DIR: Path = self.STORAGE_DIR / "voices"
 
         self._create_storage_dirs()
 
@@ -98,6 +100,7 @@ class Settings:
         self.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
         self.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
         self.JOBS_DIR.mkdir(parents=True, exist_ok=True)
+        self.VOICES_DIR.mkdir(parents=True, exist_ok=True)
 
     def __repr__(self) -> str:
         return (

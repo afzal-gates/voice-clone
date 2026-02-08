@@ -1,0 +1,2364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoiceClone AI</title>
+<style>
+/* ============================================================
+   CSS Custom Properties
+   ============================================================ */
+:root {
+  --bg-primary: #0f172a;
+  --bg-card: #1e293b;
+  --bg-card-hover: #253349;
+  --bg-input: #0f172a;
+  --bg-surface: #162033;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-subtle: rgba(99, 102, 241, 0.15);
+  --accent-glow: rgba(99, 102, 241, 0.3);
+  --success: #22c55e;
+  --success-subtle: rgba(34, 197, 94, 0.15);
+  --error: #ef4444;
+  --error-subtle: rgba(239, 68, 68, 0.15);
+  --warning: #f59e0b;
+  --warning-subtle: rgba(245, 158, 11, 0.15);
+  --border: #334155;
+  --border-light: #475569;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --transition: 0.2s ease;
+  --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ============================================================
+   Reset & Base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.625rem 0.875rem;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.app-layout {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+}
+
+.main-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 0;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.main-content {
+  min-width: 0;
+  padding-right: 1.5rem;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-brand svg {
+  flex-shrink: 0;
+}
+
+.header-brand h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background var(--transition);
+}
+
+.status-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+.status-dot.error {
+  background: var(--error);
+  box-shadow: 0 0 6px var(--error);
+}
+
+/* ============================================================
+   Tab Navigation
+   ============================================================ */
+.tab-nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 0.25rem;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  text-align: center;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.tab-btn[aria-selected="true"] {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+  animation: fadeIn 0.25s ease;
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  transition: border-color var(--transition);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ============================================================
+   Upload Zone
+   ============================================================ */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.upload-zone.dragover {
+  transform: scale(1.01);
+}
+
+.upload-zone-icon {
+  margin-bottom: 1rem;
+  color: var(--accent);
+}
+
+.upload-zone h3 {
+  font-size: 1.0625rem;
+  margin-bottom: 0.375rem;
+}
+
+.upload-zone p {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.upload-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-selected {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.file-selected.show {
+  display: flex;
+}
+
+.file-selected .filename {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.file-selected .file-size {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  flex-shrink: 0;
+}
+
+.file-selected .remove-file {
+  color: var(--text-muted);
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition);
+  flex-shrink: 0;
+}
+
+.file-selected .remove-file:hover {
+  color: var(--error);
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6875rem 1.25rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.btn-success {
+  background: var(--success);
+  color: #fff;
+}
+
+.btn-success:hover {
+  filter: brightness(1.15);
+}
+
+.btn-danger {
+  background: var(--error-subtle);
+  color: var(--error);
+  border: 1px solid transparent;
+}
+
+.btn-danger:hover {
+  border-color: var(--error);
+}
+
+.btn-sm {
+  padding: 0.4375rem 0.875rem;
+  font-size: 0.8125rem;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   Progress Bar
+   ============================================================ */
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-surface);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.75rem;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+
+.progress-bar-fill.indeterminate {
+  width: 30% !important;
+  animation: indeterminate 1.5s ease infinite;
+}
+
+/* ============================================================
+   Pipeline Stepper
+   ============================================================ */
+.pipeline-stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 80px;
+  position: relative;
+  text-align: center;
+}
+
+.pipeline-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  left: calc(50% + 18px);
+  width: calc(100% - 36px);
+  height: 2px;
+  background: var(--border);
+  transition: background var(--transition);
+}
+
+.pipeline-step.completed:not(:last-child)::after {
+  background: var(--success);
+}
+
+.pipeline-step.active:not(:last-child)::after {
+  background: linear-gradient(90deg, var(--accent), var(--border));
+}
+
+.step-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  background: var(--bg-surface);
+  border: 2px solid var(--border);
+  transition: all var(--transition);
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.pipeline-step.completed .step-icon {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+.pipeline-step.active .step-icon {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 12px var(--accent-glow);
+  animation: pulse 2s ease infinite;
+}
+
+.pipeline-step.failed .step-icon {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+}
+
+.step-label {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  line-height: 1.3;
+  max-width: 70px;
+}
+
+.pipeline-step.completed .step-label { color: var(--success); }
+.pipeline-step.active .step-label { color: var(--accent-hover); font-weight: 600; }
+.pipeline-step.failed .step-label { color: var(--error); }
+
+.status-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.status-text .progress-pct {
+  color: var(--accent-hover);
+  font-weight: 700;
+}
+
+/* ============================================================
+   Speaker Cards
+   ============================================================ */
+.speaker-cards {
+  display: grid;
+  gap: 1rem;
+}
+
+.speaker-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  transition: border-color var(--transition);
+}
+
+.speaker-card.assigned {
+  border-color: var(--success);
+}
+
+.speaker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.speaker-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.speaker-name .assigned-check {
+  color: var(--success);
+  display: none;
+}
+
+.speaker-card.assigned .speaker-name .assigned-check {
+  display: inline-flex;
+}
+
+.speaker-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.speaker-meta span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.transcript-toggle {
+  font-size: 0.8125rem;
+  color: var(--accent);
+  padding: 0;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.transcript-toggle:hover { color: var(--accent-hover); }
+
+.transcript-preview {
+  display: none;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+.transcript-preview.open { display: block; }
+
+.segment-line {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.125rem 0;
+}
+
+.segment-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+.segment-text {
+  color: var(--text-secondary);
+}
+
+.speaker-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.speaker-upload-row .ref-filename {
+  font-size: 0.8125rem;
+  color: var(--success);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   Result Panel
+   ============================================================ */
+.result-panel {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.result-panel .success-icon {
+  color: var(--success);
+  margin-bottom: 1rem;
+}
+
+.result-panel h3 {
+  font-size: 1.125rem;
+  margin-bottom: 0.375rem;
+}
+
+.result-panel p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.download-group {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.audio-preview {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto 1.25rem;
+}
+
+.audio-preview audio {
+  width: 100%;
+  border-radius: var(--radius);
+  outline: none;
+}
+
+/* ============================================================
+   Text to Speech
+   ============================================================ */
+.tts-form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.form-group {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.form-group label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.form-group textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.slider-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.slider-group {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.slider-group label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+}
+
+.slider-group label span {
+  color: var(--accent-hover);
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-surface);
+  border: none;
+  padding: 0;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: box-shadow var(--transition);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+}
+
+.tts-ref-upload {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tts-ref-upload .ref-filename {
+  font-size: 0.8125rem;
+  color: var(--success);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tts-result {
+  display: none;
+}
+
+.tts-result.show {
+  display: block;
+}
+
+/* ============================================================
+   Jobs Sidebar
+   ============================================================ */
+.sidebar {
+  border-left: 1px solid var(--border);
+  padding-left: 1.5rem;
+  max-height: calc(100vh - 64px - 3rem);
+  overflow-y: auto;
+  position: sticky;
+  top: calc(64px + 1.5rem);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.sidebar-header h2 {
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.sidebar-toggle {
+  display: none;
+  padding: 0.375rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.sidebar-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.job-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.job-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: grid;
+  gap: 0.375rem;
+}
+
+.job-item:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+.job-item.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.job-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.job-item-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.job-item-delete {
+  padding: 0.25rem;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.job-item:hover .job-item-delete { opacity: 1; }
+
+.job-item-delete:hover {
+  color: var(--error);
+  background: var(--error-subtle);
+}
+
+.job-item-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.job-item-time {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   Status Badges
+   ============================================================ */
+.badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 100px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.badge-pending { background: var(--accent-subtle); color: var(--accent-hover); }
+.badge-processing { background: var(--warning-subtle); color: var(--warning); }
+.badge-awaiting { background: var(--accent-subtle); color: var(--accent-hover); }
+.badge-completed { background: var(--success-subtle); color: var(--success); }
+.badge-failed { background: var(--error-subtle); color: var(--error); }
+
+/* ============================================================
+   Toast Notifications
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  top: 76px;
+  right: 1.5rem;
+  z-index: 1000;
+  display: grid;
+  gap: 0.5rem;
+  max-width: 380px;
+  width: 100%;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  box-shadow: var(--shadow);
+  animation: slideIn 0.3s ease;
+  pointer-events: auto;
+}
+
+.toast.removing {
+  animation: slideOut 0.3s ease forwards;
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  margin-top: 0.0625rem;
+}
+
+.toast-error { border-left: 3px solid var(--error); }
+.toast-error .toast-icon { color: var(--error); }
+.toast-success { border-left: 3px solid var(--success); }
+.toast-success .toast-icon { color: var(--success); }
+.toast-warning { border-left: 3px solid var(--warning); }
+.toast-warning .toast-icon { color: var(--warning); }
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 0.125rem;
+}
+
+.toast-msg {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.toast-close {
+  padding: 0.25rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.toast-close:hover { color: var(--text-primary); }
+
+/* ============================================================
+   Error Panel
+   ============================================================ */
+.error-panel {
+  background: var(--error-subtle);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.error-panel .error-icon {
+  color: var(--error);
+  margin-bottom: 0.75rem;
+}
+
+.error-panel h3 {
+  color: var(--error);
+  margin-bottom: 0.375rem;
+}
+
+.error-panel p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+/* ============================================================
+   Empty State
+   ============================================================ */
+.empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+.hidden { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 0 8px transparent; }
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* ============================================================
+   Scrollbar Styling
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 960px) {
+  .main-wrapper {
+    grid-template-columns: 1fr;
+  }
+  .main-content {
+    padding-right: 0;
+  }
+  .sidebar {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 1.5rem;
+    position: static;
+    max-height: none;
+  }
+  .sidebar.collapsed .job-list {
+    display: none;
+  }
+  .sidebar-toggle {
+    display: block;
+  }
+  .pipeline-stepper {
+    gap: 0;
+  }
+  .pipeline-step {
+    min-width: 64px;
+  }
+  .step-label {
+    font-size: 0.625rem;
+    max-width: 56px;
+  }
+  .slider-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .main-wrapper {
+    padding: 1rem;
+  }
+  .card {
+    padding: 1rem;
+  }
+  .upload-zone {
+    padding: 2rem 1rem;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- ====================================================
+       HEADER
+       ==================================================== -->
+  <header class="header" role="banner">
+    <div class="header-brand">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#6366f1" fill-opacity="0.15"/>
+        <path d="M8 20V12" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+        <path d="M11 18V14" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+        <path d="M14 22V10" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+        <path d="M17 19V13" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+        <path d="M20 24V8" stroke="#6366f1" stroke-width="2" stroke-linecap="round"/>
+        <path d="M23 18V14" stroke="#818cf8" stroke-width="2" stroke-linecap="round"/>
+        <path d="M26 20V12" stroke="#818cf8" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <h1>VoiceClone AI</h1>
+    </div>
+    <div class="connection-status" role="status" aria-live="polite">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusLabel">Connecting...</span>
+    </div>
+  </header>
+
+  <div class="main-wrapper">
+    <!-- ====================================================
+         MAIN CONTENT
+         ==================================================== -->
+    <main class="main-content" role="main">
+      <!-- Tab Navigation -->
+      <nav class="tab-nav" role="tablist" aria-label="Main sections">
+        <button class="tab-btn" role="tab" id="tabReplace" aria-selected="true" aria-controls="panelReplace" tabindex="0">Voice Replace</button>
+        <button class="tab-btn" role="tab" id="tabTTS" aria-selected="false" aria-controls="panelTTS" tabindex="-1">Text to Speech</button>
+      </nav>
+
+      <!-- ================================================
+           VOICE REPLACE TAB
+           ================================================ -->
+      <section class="tab-panel active" id="panelReplace" role="tabpanel" aria-labelledby="tabReplace">
+
+        <!-- Upload Zone -->
+        <div class="card" id="uploadCard">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Media
+          </div>
+          <div class="upload-zone" id="uploadZone" role="button" tabindex="0" aria-label="Upload audio or video file, drag and drop or click to browse">
+            <input type="file" id="fileInput" accept=".wav,.mp3,.mp4,.mkv,.avi,.mov" aria-label="Select file">
+            <div class="upload-zone-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <h3>Drop your file here or click to browse</h3>
+            <p>Supports WAV, MP3, MP4, MKV, AVI, MOV</p>
+          </div>
+          <div class="file-selected" id="fileSelected">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="filename" id="fileName"></span>
+            <span class="file-size" id="fileSize"></span>
+            <button class="remove-file" id="removeFile" aria-label="Remove selected file">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="progress-bar hidden" id="uploadProgress">
+            <div class="progress-bar-fill" id="uploadProgressFill"></div>
+          </div>
+          <button class="btn btn-primary btn-block mt-2 hidden" id="uploadBtn" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload and Process
+          </button>
+        </div>
+
+        <!-- Processing Status -->
+        <div class="card hidden" id="processingCard">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Processing Pipeline
+          </div>
+          <div class="pipeline-stepper" id="pipelineStepper" role="list" aria-label="Processing stages">
+            <!-- Steps injected by JS -->
+          </div>
+          <div class="progress-bar mt-2">
+            <div class="progress-bar-fill" id="pipelineProgressFill"></div>
+          </div>
+          <div class="status-text" id="statusText"></div>
+        </div>
+
+        <!-- Speaker Assignment -->
+        <div class="card hidden" id="speakerCard">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Assign Voice References
+          </div>
+          <p style="font-size:0.8125rem; color:var(--text-secondary); margin-bottom:1rem;">Upload a voice sample for each detected speaker. The AI will clone these voices for replacement.</p>
+          <div class="speaker-cards" id="speakerCards">
+            <!-- Speaker cards injected by JS -->
+          </div>
+          <button class="btn btn-primary btn-block mt-3" id="startReplacementBtn" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Start Voice Replacement
+          </button>
+        </div>
+
+        <!-- Result Panel -->
+        <div class="card hidden" id="resultCard">
+          <div class="result-panel">
+            <div class="success-icon">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h3>Voice Replacement Complete</h3>
+            <p>Your processed file is ready to download.</p>
+            <div class="audio-preview" id="resultAudioPreview">
+              <audio controls id="resultAudio" aria-label="Processed audio preview"></audio>
+            </div>
+            <div class="download-group" id="downloadGroup">
+              <!-- Download buttons injected by JS -->
+            </div>
+            <button class="btn btn-secondary mt-2" id="newJobBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              New Job
+            </button>
+          </div>
+        </div>
+
+        <!-- Error Panel -->
+        <div class="card hidden" id="errorCard">
+          <div class="error-panel">
+            <div class="error-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
+            <h3>Processing Failed</h3>
+            <p id="errorMessage">An unknown error occurred.</p>
+            <div class="btn-group" style="justify-content:center;">
+              <button class="btn btn-secondary" id="retryBtn">Retry</button>
+              <button class="btn btn-secondary" id="newJobFromErrorBtn">New Job</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================
+           TEXT TO SPEECH TAB
+           ================================================ -->
+      <section class="tab-panel" id="panelTTS" role="tabpanel" aria-labelledby="tabTTS">
+        <div class="card">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            Text to Speech
+          </div>
+          <div class="tts-form">
+            <div class="form-group">
+              <label for="ttsText">Text</label>
+              <textarea id="ttsText" placeholder="Enter text to synthesize..." rows="6"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Reference Voice (optional)</label>
+              <div class="tts-ref-upload">
+                <button class="btn btn-secondary btn-sm" id="ttsRefBtn" type="button">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Upload voice sample
+                </button>
+                <span class="ref-filename" id="ttsRefName"></span>
+                <input type="file" id="ttsRefInput" accept=".wav,.mp3" class="hidden" aria-label="Upload reference voice">
+              </div>
+            </div>
+
+            <div class="slider-row">
+              <div class="slider-group">
+                <label for="ttsSpeed">Speed <span id="ttsSpeedVal">1.0x</span></label>
+                <input type="range" id="ttsSpeed" min="0.5" max="2.0" step="0.1" value="1.0">
+              </div>
+              <div class="slider-group">
+                <label for="ttsPitch">Pitch <span id="ttsPitchVal">1.0x</span></label>
+                <input type="range" id="ttsPitch" min="0.5" max="2.0" step="0.1" value="1.0">
+              </div>
+            </div>
+
+            <button class="btn btn-primary btn-block" id="ttsGenerateBtn" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Generate Speech
+            </button>
+          </div>
+        </div>
+
+        <!-- TTS Processing -->
+        <div class="card hidden" id="ttsProcessingCard">
+          <div class="card-title">
+            <span class="spinner"></span>
+            Generating speech...
+          </div>
+          <div class="progress-bar">
+            <div class="progress-bar-fill indeterminate"></div>
+          </div>
+          <div class="status-text mt-1" id="ttsStatusText">Processing your request...</div>
+        </div>
+
+        <!-- TTS Result -->
+        <div class="card hidden" id="ttsResultCard">
+          <div class="result-panel">
+            <div class="success-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h3>Speech Generated</h3>
+            <p>Your synthesized audio is ready.</p>
+            <div class="audio-preview">
+              <audio controls id="ttsResultAudio" aria-label="Synthesized audio preview"></audio>
+            </div>
+            <div class="download-group" id="ttsDownloadGroup"></div>
+            <button class="btn btn-secondary mt-2" id="ttsNewBtn">Generate Another</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ====================================================
+         JOBS SIDEBAR
+         ==================================================== -->
+    <aside class="sidebar" id="sidebar" aria-label="Recent jobs">
+      <div class="sidebar-header">
+        <h2>Recent Jobs</h2>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle jobs list" aria-expanded="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
+      <div class="job-list" id="jobList">
+        <div class="empty-state" id="jobsEmpty">No jobs yet</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+
+<script>
+/* ==============================================================
+   VoiceClone AI - Frontend Application
+   ==============================================================
+   Pure vanilla JS, no external dependencies.
+   ============================================================== */
+
+(function () {
+  'use strict';
+
+  /* -----------------------------------------------
+     Constants
+     ----------------------------------------------- */
+  const API_BASE = '';  // same origin
+  const POLL_INTERVAL = 2000;
+  const PIPELINE_STAGES = [
+    { key: 'extracting_audio', label: 'Extract', icon: '1' },
+    { key: 'separating',       label: 'Separate', icon: '2' },
+    { key: 'diarizing',        label: 'Diarize', icon: '3' },
+    { key: 'transcribing',     label: 'Transcribe', icon: '4' },
+    { key: 'awaiting_voice_assignment', label: 'Assign', icon: '5' },
+    { key: 'generating_speech', label: 'Generate', icon: '6' },
+    { key: 'aligning',         label: 'Align', icon: '7' },
+    { key: 'merging',          label: 'Merge', icon: '8' },
+    { key: 'completed',        label: 'Done', icon: '\u2713' },
+  ];
+
+  const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov'];
+
+  /* -----------------------------------------------
+     State
+     ----------------------------------------------- */
+  const state = {
+    currentJobId: null,
+    currentJobData: null,
+    selectedFile: null,
+    pollTimer: null,
+    ttsPollTimer: null,
+    ttsJobId: null,
+    ttsRefFile: null,
+    speakerRefs: {},  // speaker_id -> filename
+    jobs: [],
+  };
+
+  /* -----------------------------------------------
+     DOM References
+     ----------------------------------------------- */
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  const dom = {
+    statusDot:       $('#statusDot'),
+    statusLabel:     $('#statusLabel'),
+    tabReplace:      $('#tabReplace'),
+    tabTTS:          $('#tabTTS'),
+    panelReplace:    $('#panelReplace'),
+    panelTTS:        $('#panelTTS'),
+    uploadCard:      $('#uploadCard'),
+    uploadZone:      $('#uploadZone'),
+    fileInput:       $('#fileInput'),
+    fileSelected:    $('#fileSelected'),
+    fileName:        $('#fileName'),
+    fileSize:        $('#fileSize'),
+    removeFile:      $('#removeFile'),
+    uploadProgress:  $('#uploadProgress'),
+    uploadProgressFill: $('#uploadProgressFill'),
+    uploadBtn:       $('#uploadBtn'),
+    processingCard:  $('#processingCard'),
+    pipelineStepper: $('#pipelineStepper'),
+    pipelineProgressFill: $('#pipelineProgressFill'),
+    statusText:      $('#statusText'),
+    speakerCard:     $('#speakerCard'),
+    speakerCards:    $('#speakerCards'),
+    startReplacementBtn: $('#startReplacementBtn'),
+    resultCard:      $('#resultCard'),
+    resultAudio:     $('#resultAudio'),
+    resultAudioPreview: $('#resultAudioPreview'),
+    downloadGroup:   $('#downloadGroup'),
+    newJobBtn:       $('#newJobBtn'),
+    errorCard:       $('#errorCard'),
+    errorMessage:    $('#errorMessage'),
+    retryBtn:        $('#retryBtn'),
+    newJobFromErrorBtn: $('#newJobFromErrorBtn'),
+    ttsText:         $('#ttsText'),
+    ttsRefBtn:       $('#ttsRefBtn'),
+    ttsRefInput:     $('#ttsRefInput'),
+    ttsRefName:      $('#ttsRefName'),
+    ttsSpeed:        $('#ttsSpeed'),
+    ttsSpeedVal:     $('#ttsSpeedVal'),
+    ttsPitch:        $('#ttsPitch'),
+    ttsPitchVal:     $('#ttsPitchVal'),
+    ttsGenerateBtn:  $('#ttsGenerateBtn'),
+    ttsProcessingCard: $('#ttsProcessingCard'),
+    ttsStatusText:   $('#ttsStatusText'),
+    ttsResultCard:   $('#ttsResultCard'),
+    ttsResultAudio:  $('#ttsResultAudio'),
+    ttsDownloadGroup:$('#ttsDownloadGroup'),
+    ttsNewBtn:       $('#ttsNewBtn'),
+    sidebar:         $('#sidebar'),
+    sidebarToggle:   $('#sidebarToggle'),
+    jobList:         $('#jobList'),
+    jobsEmpty:       $('#jobsEmpty'),
+    toastContainer:  $('#toastContainer'),
+  };
+
+  /* -----------------------------------------------
+     Utility Functions
+     ----------------------------------------------- */
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds && seconds !== 0) return '--:--';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function formatTimestamp(ts) {
+    const m = Math.floor(ts / 60);
+    const s = (ts % 60).toFixed(1);
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(4, '0');
+  }
+
+  function formatDateShort(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return diffMin + 'm ago';
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return diffH + 'h ago';
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return diffD + 'd ago';
+    return d.toLocaleDateString();
+  }
+
+  function getFileExtension(filename) {
+    return (filename || '').split('.').pop().toLowerCase();
+  }
+
+  function isVideoFile(filename) {
+    return VIDEO_EXTENSIONS.includes(getFileExtension(filename));
+  }
+
+  function statusToHumanLabel(status) {
+    const map = {
+      pending: 'Pending',
+      extracting_audio: 'Extracting Audio',
+      separating: 'Separating Sources',
+      diarizing: 'Diarizing Speakers',
+      transcribing: 'Transcribing',
+      awaiting_voice_assignment: 'Awaiting Voice Assignment',
+      generating_speech: 'Generating Speech',
+      aligning: 'Aligning Audio',
+      merging: 'Merging Output',
+      completed: 'Completed',
+      failed: 'Failed',
+    };
+    return map[status] || status;
+  }
+
+  function getStatusBadgeClass(status) {
+    if (status === 'completed') return 'badge-completed';
+    if (status === 'failed') return 'badge-failed';
+    if (status === 'awaiting_voice_assignment') return 'badge-awaiting';
+    if (status === 'pending') return 'badge-pending';
+    return 'badge-processing';
+  }
+
+  function show(el) { el.classList.remove('hidden'); }
+  function hide(el) { el.classList.add('hidden'); }
+
+  /* -----------------------------------------------
+     Toast Notifications
+     ----------------------------------------------- */
+  function showToast(type, title, message) {
+    const iconMap = {
+      error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+      success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+      warning: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    };
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+      <span class="toast-icon">${iconMap[type] || iconMap.error}</span>
+      <div class="toast-body">
+        <div class="toast-title">${title}</div>
+        ${message ? '<div class="toast-msg">' + message + '</div>' : ''}
+      </div>
+      <button class="toast-close" aria-label="Dismiss notification">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>`;
+    dom.toastContainer.appendChild(toast);
+    const closeBtn = toast.querySelector('.toast-close');
+    const dismiss = () => {
+      toast.classList.add('removing');
+      setTimeout(() => toast.remove(), 300);
+    };
+    closeBtn.addEventListener('click', dismiss);
+    setTimeout(dismiss, 6000);
+  }
+
+  /* -----------------------------------------------
+     API Helpers
+     ----------------------------------------------- */
+  async function apiFetch(path, options = {}) {
+    try {
+      const resp = await fetch(API_BASE + path, options);
+      if (!resp.ok) {
+        let errMsg = `HTTP ${resp.status}`;
+        try {
+          const errData = await resp.json();
+          errMsg = errData.detail || errData.message || errMsg;
+        } catch (_) { /* ignore parse error */ }
+        throw new Error(errMsg);
+      }
+      return resp;
+    } catch (err) {
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        throw new Error('Network error: cannot reach the server.');
+      }
+      throw err;
+    }
+  }
+
+  async function apiJSON(path, options = {}) {
+    const resp = await apiFetch(path, options);
+    return resp.json();
+  }
+
+  /* -----------------------------------------------
+     Health Check
+     ----------------------------------------------- */
+  async function checkHealth() {
+    try {
+      const data = await apiJSON('/api/health');
+      dom.statusDot.className = 'status-dot connected';
+      dom.statusLabel.textContent = (data.app || 'VoiceClone') + ' v' + (data.version || '?');
+      return true;
+    } catch {
+      dom.statusDot.className = 'status-dot error';
+      dom.statusLabel.textContent = 'Disconnected';
+      return false;
+    }
+  }
+
+  /* -----------------------------------------------
+     Tab Management
+     ----------------------------------------------- */
+  function initTabs() {
+    const tabs = [dom.tabReplace, dom.tabTTS];
+    const panels = [dom.panelReplace, dom.panelTTS];
+
+    function activateTab(idx) {
+      tabs.forEach((t, i) => {
+        const active = i === idx;
+        t.setAttribute('aria-selected', String(active));
+        t.tabIndex = active ? 0 : -1;
+        panels[i].classList.toggle('active', active);
+      });
+    }
+
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => activateTab(i));
+      t.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const next = e.key === 'ArrowRight' ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
+          activateTab(next);
+          tabs[next].focus();
+        }
+      });
+    });
+  }
+
+  /* -----------------------------------------------
+     File Selection
+     ----------------------------------------------- */
+  function initUpload() {
+    const zone = dom.uploadZone;
+    const input = dom.fileInput;
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+      zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.remove('dragover'); });
+    });
+
+    zone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) selectFile(files[0]);
+    });
+
+    input.addEventListener('change', () => {
+      if (input.files.length > 0) selectFile(input.files[0]);
+    });
+
+    zone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        input.click();
+      }
+    });
+
+    dom.removeFile.addEventListener('click', clearFile);
+    dom.uploadBtn.addEventListener('click', handleUpload);
+  }
+
+  function selectFile(file) {
+    const allowedExt = ['wav', 'mp3', 'mp4', 'mkv', 'avi', 'mov'];
+    const ext = getFileExtension(file.name);
+    if (!allowedExt.includes(ext)) {
+      showToast('error', 'Unsupported file', 'Please select a WAV, MP3, MP4, MKV, AVI, or MOV file.');
+      return;
+    }
+    state.selectedFile = file;
+    dom.fileName.textContent = file.name;
+    dom.fileSize.textContent = formatBytes(file.size);
+    dom.fileSelected.classList.add('show');
+    dom.uploadBtn.disabled = false;
+    show(dom.uploadBtn);
+  }
+
+  function clearFile() {
+    state.selectedFile = null;
+    dom.fileInput.value = '';
+    dom.fileSelected.classList.remove('show');
+    dom.uploadBtn.disabled = true;
+    hide(dom.uploadBtn);
+    hide(dom.uploadProgress);
+  }
+
+  /* -----------------------------------------------
+     Upload Handler
+     ----------------------------------------------- */
+  async function handleUpload() {
+    if (!state.selectedFile) return;
+    dom.uploadBtn.disabled = true;
+    dom.uploadBtn.innerHTML = '<span class="spinner"></span> Uploading...';
+    show(dom.uploadProgress);
+    dom.uploadProgressFill.style.width = '0%';
+
+    const formData = new FormData();
+    formData.append('file', state.selectedFile);
+
+    try {
+      // Simulate progress for UX (real XHR progress would need XMLHttpRequest)
+      let prog = 0;
+      const progTimer = setInterval(() => {
+        prog = Math.min(prog + Math.random() * 15, 90);
+        dom.uploadProgressFill.style.width = prog + '%';
+      }, 200);
+
+      const data = await apiJSON('/api/upload', { method: 'POST', body: formData });
+      clearInterval(progTimer);
+      dom.uploadProgressFill.style.width = '100%';
+
+      state.currentJobId = data.job_id;
+      showToast('success', 'Upload successful', data.message || 'Processing started.');
+
+      setTimeout(() => {
+        hide(dom.uploadCard);
+        showProcessingUI();
+        startPolling();
+        refreshJobs();
+      }, 400);
+    } catch (err) {
+      showToast('error', 'Upload failed', err.message);
+      dom.uploadBtn.disabled = false;
+      dom.uploadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload and Process';
+      hide(dom.uploadProgress);
+    }
+  }
+
+  /* -----------------------------------------------
+     Processing Pipeline UI
+     ----------------------------------------------- */
+  function buildPipelineStepper() {
+    dom.pipelineStepper.innerHTML = PIPELINE_STAGES.map(s =>
+      `<div class="pipeline-step" data-stage="${s.key}" role="listitem" aria-label="${s.label}">
+        <div class="step-icon">${s.icon}</div>
+        <span class="step-label">${s.label}</span>
+      </div>`
+    ).join('');
+  }
+
+  function showProcessingUI() {
+    buildPipelineStepper();
+    show(dom.processingCard);
+    hide(dom.speakerCard);
+    hide(dom.resultCard);
+    hide(dom.errorCard);
+  }
+
+  function updatePipelineUI(status, progress) {
+    const stageKeys = PIPELINE_STAGES.map(s => s.key);
+    const currentIdx = stageKeys.indexOf(status);
+    const steps = dom.pipelineStepper.querySelectorAll('.pipeline-step');
+
+    steps.forEach((step, i) => {
+      step.classList.remove('completed', 'active', 'failed');
+      if (status === 'failed') {
+        if (i < currentIdx) step.classList.add('completed');
+        else if (i === currentIdx || (currentIdx === -1 && i === 0)) step.classList.add('failed');
+      } else if (currentIdx >= 0) {
+        if (i < currentIdx) step.classList.add('completed');
+        else if (i === currentIdx) step.classList.add('active');
+      }
+    });
+
+    // Progress bar
+    const pct = (progress != null) ? progress : (currentIdx >= 0 ? Math.round((currentIdx / (stageKeys.length - 1)) * 100) : 0);
+    dom.pipelineProgressFill.style.width = pct + '%';
+
+    // Status text
+    const label = statusToHumanLabel(status);
+    dom.statusText.innerHTML = status === 'completed'
+      ? '<span class="progress-pct">100%</span> &mdash; ' + label
+      : '<span class="progress-pct">' + pct + '%</span> &mdash; ' + label;
+  }
+
+  /* -----------------------------------------------
+     Polling
+     ----------------------------------------------- */
+  function startPolling() {
+    stopPolling();
+    pollJob();
+    state.pollTimer = setInterval(pollJob, POLL_INTERVAL);
+  }
+
+  function stopPolling() {
+    if (state.pollTimer) {
+      clearInterval(state.pollTimer);
+      state.pollTimer = null;
+    }
+  }
+
+  async function pollJob() {
+    if (!state.currentJobId) return;
+    try {
+      const data = await apiJSON('/api/jobs/' + state.currentJobId);
+      state.currentJobData = data;
+      handleJobUpdate(data);
+    } catch (err) {
+      showToast('error', 'Polling error', err.message);
+    }
+  }
+
+  function handleJobUpdate(data) {
+    const status = data.status;
+    updatePipelineUI(status, data.progress);
+
+    if (status === 'awaiting_voice_assignment') {
+      stopPolling();
+      showSpeakerAssignment(data);
+    } else if (status === 'completed') {
+      stopPolling();
+      showResult(data);
+      refreshJobs();
+    } else if (status === 'failed') {
+      stopPolling();
+      showError(data.error || 'Processing failed. Please try again.');
+      refreshJobs();
+    }
+  }
+
+  /* -----------------------------------------------
+     Speaker Assignment
+     ----------------------------------------------- */
+  function showSpeakerAssignment(data) {
+    show(dom.speakerCard);
+    hide(dom.resultCard);
+    hide(dom.errorCard);
+    state.speakerRefs = {};
+
+    const speakers = data.speakers || [];
+    const segments = data.segments || [];
+
+    dom.speakerCards.innerHTML = speakers.map((sp, idx) => {
+      const spSegments = segments.filter(seg => seg.speaker_id === sp.speaker_id);
+      const label = sp.label || ('Speaker ' + (idx + 1));
+      const segCount = sp.segment_count || spSegments.length;
+      const duration = sp.total_duration != null ? formatDuration(sp.total_duration) : '--:--';
+      const hasRef = !!sp.assigned_voice_ref;
+
+      if (hasRef) {
+        state.speakerRefs[sp.speaker_id] = sp.assigned_voice_ref;
+      }
+
+      return `
+        <div class="speaker-card ${hasRef ? 'assigned' : ''}" data-speaker-id="${sp.speaker_id}" id="spkCard_${sp.speaker_id}">
+          <div class="speaker-header">
+            <div class="speaker-name">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              ${label}
+              <span class="assigned-check">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </span>
+            </div>
+          </div>
+          <div class="speaker-meta">
+            <span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+              ${segCount} segments
+            </span>
+            <span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              ${duration}
+            </span>
+          </div>
+          ${spSegments.length > 0 ? `
+          <button class="transcript-toggle" data-target="transcript_${sp.speaker_id}" aria-expanded="false">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            Show transcript
+          </button>
+          <div class="transcript-preview" id="transcript_${sp.speaker_id}">
+            ${spSegments.map(seg => `
+              <div class="segment-line">
+                <span class="segment-time">${formatTimestamp(seg.start_time)} - ${formatTimestamp(seg.end_time)}</span>
+                <span class="segment-text">${escapeHtml(seg.text || '')}</span>
+              </div>
+            `).join('')}
+          </div>` : ''}
+          <div class="speaker-upload-row">
+            <button class="btn btn-secondary btn-sm spk-upload-btn" data-speaker-id="${sp.speaker_id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Reference Voice
+            </button>
+            <span class="ref-filename" id="refName_${sp.speaker_id}">${hasRef ? sp.assigned_voice_ref : ''}</span>
+            <input type="file" class="hidden spk-file-input" data-speaker-id="${sp.speaker_id}" accept=".wav,.mp3" aria-label="Upload reference voice for ${label}">
+          </div>
+        </div>`;
+    }).join('');
+
+    // Bind transcript toggles
+    dom.speakerCards.querySelectorAll('.transcript-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = document.getElementById(btn.dataset.target);
+        const open = target.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(open));
+        btn.querySelector('svg').style.transform = open ? 'rotate(180deg)' : '';
+        btn.childNodes[btn.childNodes.length - 1].textContent = open ? ' Hide transcript' : ' Show transcript';
+      });
+    });
+
+    // Bind speaker upload buttons
+    dom.speakerCards.querySelectorAll('.spk-upload-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const spkId = btn.dataset.speakerId;
+        const fileInput = dom.speakerCards.querySelector(`.spk-file-input[data-speaker-id="${spkId}"]`);
+        fileInput.click();
+      });
+    });
+
+    dom.speakerCards.querySelectorAll('.spk-file-input').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.files.length > 0) {
+          uploadReferenceVoice(input.dataset.speakerId, input.files[0]);
+        }
+      });
+    });
+
+    updateStartReplacementBtn();
+  }
+
+  function escapeHtml(str) {
+    const el = document.createElement('span');
+    el.textContent = str;
+    return el.innerHTML;
+  }
+
+  async function uploadReferenceVoice(speakerId, file) {
+    const btn = dom.speakerCards.querySelector(`.spk-upload-btn[data-speaker-id="${speakerId}"]`);
+    const origHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Uploading...';
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('speaker_id', speakerId);
+
+    try {
+      const data = await apiJSON('/api/jobs/' + state.currentJobId + '/reference-voice', {
+        method: 'POST',
+        body: formData,
+      });
+
+      state.speakerRefs[speakerId] = data.filename || file.name;
+      const card = document.getElementById('spkCard_' + speakerId);
+      if (card) card.classList.add('assigned');
+      const refName = document.getElementById('refName_' + speakerId);
+      if (refName) refName.textContent = data.filename || file.name;
+
+      showToast('success', 'Reference uploaded', 'Voice reference for speaker assigned.');
+    } catch (err) {
+      showToast('error', 'Upload failed', err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origHTML;
+      updateStartReplacementBtn();
+    }
+  }
+
+  function updateStartReplacementBtn() {
+    const speakers = (state.currentJobData && state.currentJobData.speakers) || [];
+    const allAssigned = speakers.length > 0 && speakers.every(sp => state.speakerRefs[sp.speaker_id]);
+    dom.startReplacementBtn.disabled = !allAssigned;
+  }
+
+  async function handleStartReplacement() {
+    const speakers = (state.currentJobData && state.currentJobData.speakers) || [];
+    const assignments = speakers.map(sp => ({
+      speaker_id: sp.speaker_id,
+      reference_audio_filename: state.speakerRefs[sp.speaker_id] || '',
+    }));
+
+    dom.startReplacementBtn.disabled = true;
+    dom.startReplacementBtn.innerHTML = '<span class="spinner"></span> Starting...';
+
+    try {
+      await apiJSON('/api/jobs/' + state.currentJobId + '/assign-voices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignments }),
+      });
+
+      hide(dom.speakerCard);
+      startPolling();
+    } catch (err) {
+      showToast('error', 'Assignment failed', err.message);
+      dom.startReplacementBtn.disabled = false;
+      dom.startReplacementBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Voice Replacement';
+    }
+  }
+
+  /* -----------------------------------------------
+     Result & Error Panels
+     ----------------------------------------------- */
+  function showResult(data) {
+    show(dom.resultCard);
+    hide(dom.speakerCard);
+
+    // Audio preview
+    if (data.output_file) {
+      dom.resultAudio.src = API_BASE + '/api/jobs/' + data.job_id + '/download?format=wav';
+      show(dom.resultAudioPreview);
+    } else {
+      hide(dom.resultAudioPreview);
+    }
+
+    // Download buttons
+    const isVideo = isVideoFile(data.input_filename || '');
+    const formats = ['wav', 'mp3'];
+    if (isVideo) formats.push('mp4');
+
+    dom.downloadGroup.innerHTML = formats.map(fmt => `
+      <a class="btn btn-success btn-sm" href="${API_BASE}/api/jobs/${data.job_id}/download?format=${fmt}" download aria-label="Download ${fmt.toUpperCase()}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        ${fmt.toUpperCase()}
+      </a>
+    `).join('');
+  }
+
+  function showError(message) {
+    show(dom.errorCard);
+    hide(dom.speakerCard);
+    hide(dom.resultCard);
+    dom.errorMessage.textContent = message;
+  }
+
+  /* -----------------------------------------------
+     Reset / New Job
+     ----------------------------------------------- */
+  function resetToUpload() {
+    stopPolling();
+    state.currentJobId = null;
+    state.currentJobData = null;
+    state.selectedFile = null;
+    state.speakerRefs = {};
+
+    clearFile();
+    show(dom.uploadCard);
+    hide(dom.processingCard);
+    hide(dom.speakerCard);
+    hide(dom.resultCard);
+    hide(dom.errorCard);
+
+    dom.uploadBtn.disabled = true;
+    dom.uploadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload and Process';
+
+    // Deselect sidebar
+    dom.jobList.querySelectorAll('.job-item').forEach(j => j.classList.remove('active'));
+  }
+
+  /* -----------------------------------------------
+     Text to Speech
+     ----------------------------------------------- */
+  function initTTS() {
+    dom.ttsSpeed.addEventListener('input', () => {
+      dom.ttsSpeedVal.textContent = parseFloat(dom.ttsSpeed.value).toFixed(1) + 'x';
+    });
+    dom.ttsPitch.addEventListener('input', () => {
+      dom.ttsPitchVal.textContent = parseFloat(dom.ttsPitch.value).toFixed(1) + 'x';
+    });
+    dom.ttsText.addEventListener('input', () => {
+      dom.ttsGenerateBtn.disabled = !dom.ttsText.value.trim();
+    });
+    dom.ttsRefBtn.addEventListener('click', () => dom.ttsRefInput.click());
+    dom.ttsRefInput.addEventListener('change', () => {
+      if (dom.ttsRefInput.files.length > 0) {
+        state.ttsRefFile = dom.ttsRefInput.files[0];
+        dom.ttsRefName.textContent = state.ttsRefFile.name;
+      }
+    });
+    dom.ttsGenerateBtn.addEventListener('click', handleTTSGenerate);
+    dom.ttsNewBtn.addEventListener('click', resetTTS);
+  }
+
+  async function handleTTSGenerate() {
+    const text = dom.ttsText.value.trim();
+    if (!text) return;
+
+    dom.ttsGenerateBtn.disabled = true;
+    dom.ttsGenerateBtn.innerHTML = '<span class="spinner"></span> Generating...';
+    show(dom.ttsProcessingCard);
+    hide(dom.ttsResultCard);
+
+    const formData = new FormData();
+    formData.append('text', text);
+    formData.append('speed', dom.ttsSpeed.value);
+    formData.append('pitch', dom.ttsPitch.value);
+    if (state.ttsRefFile) {
+      formData.append('reference_audio', state.ttsRefFile);
+    }
+
+    try {
+      const data = await apiJSON('/api/tts', { method: 'POST', body: formData });
+      state.ttsJobId = data.job_id;
+
+      if (data.output_file) {
+        showTTSResult(data);
+      } else {
+        startTTSPolling();
+      }
+      refreshJobs();
+    } catch (err) {
+      showToast('error', 'TTS failed', err.message);
+      hide(dom.ttsProcessingCard);
+      dom.ttsGenerateBtn.disabled = false;
+      dom.ttsGenerateBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Generate Speech';
+    }
+  }
+
+  function startTTSPolling() {
+    stopTTSPolling();
+    state.ttsPollTimer = setInterval(pollTTSJob, POLL_INTERVAL);
+  }
+
+  function stopTTSPolling() {
+    if (state.ttsPollTimer) {
+      clearInterval(state.ttsPollTimer);
+      state.ttsPollTimer = null;
+    }
+  }
+
+  async function pollTTSJob() {
+    if (!state.ttsJobId) return;
+    try {
+      const data = await apiJSON('/api/jobs/' + state.ttsJobId);
+      dom.ttsStatusText.textContent = statusToHumanLabel(data.status) + '...';
+
+      if (data.status === 'completed') {
+        stopTTSPolling();
+        showTTSResult(data);
+        refreshJobs();
+      } else if (data.status === 'failed') {
+        stopTTSPolling();
+        hide(dom.ttsProcessingCard);
+        showToast('error', 'TTS failed', data.error || 'Speech generation failed.');
+        dom.ttsGenerateBtn.disabled = false;
+        dom.ttsGenerateBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Generate Speech';
+        refreshJobs();
+      }
+    } catch (err) {
+      showToast('error', 'Polling error', err.message);
+    }
+  }
+
+  function showTTSResult(data) {
+    hide(dom.ttsProcessingCard);
+    show(dom.ttsResultCard);
+
+    const jobId = data.job_id || state.ttsJobId;
+    dom.ttsResultAudio.src = API_BASE + '/api/jobs/' + jobId + '/download?format=wav';
+
+    dom.ttsDownloadGroup.innerHTML = ['wav', 'mp3'].map(fmt => `
+      <a class="btn btn-success btn-sm" href="${API_BASE}/api/jobs/${jobId}/download?format=${fmt}" download aria-label="Download ${fmt.toUpperCase()}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        ${fmt.toUpperCase()}
+      </a>
+    `).join('');
+
+    dom.ttsGenerateBtn.disabled = false;
+    dom.ttsGenerateBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Generate Speech';
+  }
+
+  function resetTTS() {
+    stopTTSPolling();
+    state.ttsJobId = null;
+    state.ttsRefFile = null;
+    dom.ttsText.value = '';
+    dom.ttsRefInput.value = '';
+    dom.ttsRefName.textContent = '';
+    dom.ttsSpeed.value = '1.0';
+    dom.ttsSpeedVal.textContent = '1.0x';
+    dom.ttsPitch.value = '1.0';
+    dom.ttsPitchVal.textContent = '1.0x';
+    dom.ttsGenerateBtn.disabled = true;
+    hide(dom.ttsProcessingCard);
+    hide(dom.ttsResultCard);
+  }
+
+  /* -----------------------------------------------
+     Jobs Sidebar
+     ----------------------------------------------- */
+  async function refreshJobs() {
+    try {
+      const jobs = await apiJSON('/api/jobs');
+      state.jobs = Array.isArray(jobs) ? jobs : [];
+      renderJobs();
+    } catch {
+      // silently fail for sidebar
+    }
+  }
+
+  function renderJobs() {
+    if (state.jobs.length === 0) {
+      show(dom.jobsEmpty);
+      dom.jobList.querySelectorAll('.job-item').forEach(el => el.remove());
+      return;
+    }
+    hide(dom.jobsEmpty);
+
+    // Sort by created_at descending
+    const sorted = [...state.jobs].sort((a, b) => {
+      const da = new Date(a.created_at || 0);
+      const db = new Date(b.created_at || 0);
+      return db - da;
+    });
+
+    dom.jobList.innerHTML = '';
+    sorted.forEach(job => {
+      const el = document.createElement('div');
+      el.className = 'job-item' + (job.job_id === state.currentJobId ? ' active' : '');
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-label', (job.input_filename || 'TTS Job') + ' - ' + statusToHumanLabel(job.status));
+
+      const name = job.input_filename || ('TTS #' + (job.job_id || '').slice(0, 8));
+      const badgeClass = getStatusBadgeClass(job.status);
+
+      el.innerHTML = `
+        <div class="job-item-top">
+          <span class="job-item-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+          <button class="job-item-delete" data-job-id="${job.job_id}" aria-label="Delete job ${escapeHtml(name)}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+        <div class="job-item-bottom">
+          <span class="job-item-time">${formatDateShort(job.created_at)}</span>
+          <span class="badge ${badgeClass}">${statusToHumanLabel(job.status)}</span>
+        </div>`;
+
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.job-item-delete')) return;
+        loadJob(job.job_id);
+      });
+
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (e.target.closest('.job-item-delete')) return;
+          loadJob(job.job_id);
+        }
+      });
+
+      const delBtn = el.querySelector('.job-item-delete');
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteJob(job.job_id);
+      });
+
+      dom.jobList.appendChild(el);
+    });
+  }
+
+  async function loadJob(jobId) {
+    // Switch to Voice Replace tab
+    dom.tabReplace.click();
+
+    stopPolling();
+    state.currentJobId = jobId;
+
+    try {
+      const data = await apiJSON('/api/jobs/' + jobId);
+      state.currentJobData = data;
+
+      hide(dom.uploadCard);
+      showProcessingUI();
+      updatePipelineUI(data.status, data.progress);
+
+      if (data.status === 'awaiting_voice_assignment') {
+        showSpeakerAssignment(data);
+      } else if (data.status === 'completed') {
+        showResult(data);
+      } else if (data.status === 'failed') {
+        showError(data.error || 'Processing failed.');
+      } else {
+        startPolling();
+      }
+
+      // Update sidebar active state
+      dom.jobList.querySelectorAll('.job-item').forEach(j => j.classList.remove('active'));
+      const activeItem = dom.jobList.querySelector(`.job-item-delete[data-job-id="${jobId}"]`);
+      if (activeItem) activeItem.closest('.job-item').classList.add('active');
+    } catch (err) {
+      showToast('error', 'Failed to load job', err.message);
+    }
+  }
+
+  async function deleteJob(jobId) {
+    try {
+      await apiFetch('/api/jobs/' + jobId, { method: 'DELETE' });
+      if (state.currentJobId === jobId) {
+        resetToUpload();
+      }
+      showToast('success', 'Job deleted', '');
+      refreshJobs();
+    } catch (err) {
+      showToast('error', 'Delete failed', err.message);
+    }
+  }
+
+  function initSidebar() {
+    dom.sidebarToggle.addEventListener('click', () => {
+      const collapsed = dom.sidebar.classList.toggle('collapsed');
+      dom.sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+      dom.sidebarToggle.querySelector('svg').style.transform = collapsed ? 'rotate(180deg)' : '';
+    });
+  }
+
+  /* -----------------------------------------------
+     Initialize
+     ----------------------------------------------- */
+  function init() {
+    initTabs();
+    initUpload();
+    initTTS();
+    initSidebar();
+
+    dom.startReplacementBtn.addEventListener('click', handleStartReplacement);
+    dom.newJobBtn.addEventListener('click', resetToUpload);
+    dom.newJobFromErrorBtn.addEventListener('click', resetToUpload);
+    dom.retryBtn.addEventListener('click', () => {
+      if (state.currentJobId) {
+        hide(dom.errorCard);
+        showProcessingUI();
+        startPolling();
+      }
+    });
+
+    // Initial health check + periodic
+    checkHealth();
+    setInterval(checkHealth, 15000);
+
+    // Load existing jobs
+    refreshJobs();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

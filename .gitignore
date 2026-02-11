@@ -1,5 +1,5 @@
 # Environment
-.env
+#.env
 
 # Storage (uploads, jobs, generated output)
 storage/
@@ -15,7 +15,7 @@ build/
 
 # Virtual environments
 venv/
-.venv/
+#.venv/
 env/
 
 # IDE
@@ -30,4 +30,4 @@ Thumbs.db
 nul
 
 # Claude Code
-.claude/
+#.claude/

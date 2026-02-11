@@ -4,6 +4,8 @@ Provides FFmpeg-based audio extraction from video files, media probing,
 and format conversion for the VoiceClone AI pipeline.
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging

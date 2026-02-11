@@ -4,6 +4,8 @@ Splits an audio file into isolated vocal and accompaniment (background)
 stems, enabling downstream processing on clean speech signals.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import shutil

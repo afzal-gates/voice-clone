@@ -5,6 +5,8 @@ fade processing, silence detection, format conversion, and signal analysis.
 All functions are stateless and operate on numpy arrays or file paths.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import subprocess

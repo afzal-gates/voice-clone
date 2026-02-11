@@ -5,6 +5,8 @@ written through to a ``profile.json`` file inside the voice's storage
 directory so that profiles survive application restarts.
 """
 
+from __future__ import annotations
+
 import logging
 import shutil
 from pathlib import Path

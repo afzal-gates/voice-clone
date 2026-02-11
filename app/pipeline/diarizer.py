@@ -4,6 +4,8 @@ Identifies *who* speaks *when* in an audio file, producing time-stamped
 speaker segments that downstream modules (transcription, TTS) consume.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from pathlib import Path

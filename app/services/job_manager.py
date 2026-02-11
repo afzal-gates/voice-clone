@@ -5,6 +5,8 @@ written through to a ``job.json`` file inside the job's storage directory so
 that jobs survive application restarts.
 """
 
+from __future__ import annotations
+
 import logging
 import shutil
 from datetime import datetime, timezone

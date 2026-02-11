@@ -5,6 +5,8 @@ assigning reference voices, launching voice replacement, standalone
 TTS, and downloading results.
 """
 
+from __future__ import annotations
+
 import asyncio
 import io
 import json

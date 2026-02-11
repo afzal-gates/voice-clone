@@ -12,6 +12,8 @@ Both models are loaded lazily on first use.  Public methods are ``async`` and
 delegate blocking inference to ``asyncio.to_thread``.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from pathlib import Path

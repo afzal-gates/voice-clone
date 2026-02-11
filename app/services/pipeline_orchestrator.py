@@ -5,6 +5,8 @@ transcription, TTS, alignment, merging) through a multi-stage async
 workflow driven by :class:`JobManager` state transitions.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 

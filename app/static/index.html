@@ -170,6 +170,138 @@ input:focus, textarea:focus, select:focus {
   box-shadow: 0 0 6px var(--error);
 }
 
+/* Header actions (settings gear + connection status) */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.settings-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.375rem;
+  border-radius: 6px;
+  transition: color var(--transition), background var(--transition);
+  position: relative;
+}
+.settings-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+/* Settings dropdown */
+.settings-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  min-width: 260px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 200;
+}
+.settings-dropdown.open {
+  display: block;
+}
+.settings-dropdown h3 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+/* Mode toggle switch */
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.mode-toggle-label {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+.mode-toggle-sublabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  transition: background var(--transition), border-color var(--transition);
+}
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition: transform var(--transition), background var(--transition);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(22px);
+  background: #fff;
+}
+
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  margin-top: 0.5rem;
+}
+.mode-badge.offline {
+  background: rgba(251,191,36,0.15);
+  color: #fbbf24;
+}
+.mode-badge.live {
+  background: rgba(34,197,94,0.15);
+  color: #22c55e;
+}
+
+.settings-note {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+  line-height: 1.4;
+}
+
 /* ============================================================
    Tab Navigation
    ============================================================ */
@@ -1333,9 +1465,29 @@ input[type="range"]::-moz-range-thumb {
       </svg>
       <h1>VoiceClone AI</h1>
     </div>
-    <div class="connection-status" role="status" aria-live="polite">
-      <span class="status-dot" id="statusDot"></span>
-      <span id="statusLabel">Connecting...</span>
+    <div class="header-actions">
+      <button class="settings-btn" id="settingsBtn" aria-label="Settings" title="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <div class="settings-dropdown" id="settingsDropdown">
+          <h3>Model Loading</h3>
+          <div class="mode-toggle">
+            <div>
+              <div class="mode-toggle-label" id="modeLabel">Offline Mode</div>
+              <div class="mode-toggle-sublabel" id="modeSublabel">Use locally cached models only</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="offlineToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="mode-badge offline" id="modeBadge">Offline</div>
+          <p class="settings-note" id="settingsNote">Models loaded from local cache. Toggle off to download from HuggingFace.</p>
+        </div>
+      </button>
+      <div class="connection-status" role="status" aria-live="polite">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusLabel">Connecting...</span>
+      </div>
     </div>
   </header>
 
@@ -1797,6 +1949,13 @@ input[type="range"]::-moz-range-thumb {
     vcTranscript:    $('#vcTranscript'),
     vcWaveform:      $('#vcWaveform'),
     vcStartBtn:      $('#vcStartBtn'),
+    settingsBtn:     $('#settingsBtn'),
+    settingsDropdown:$('#settingsDropdown'),
+    offlineToggle:   $('#offlineToggle'),
+    modeLabel:       $('#modeLabel'),
+    modeSublabel:    $('#modeSublabel'),
+    modeBadge:       $('#modeBadge'),
+    settingsNote:    $('#settingsNote'),
   };
 
   /* -----------------------------------------------
@@ -3296,6 +3455,89 @@ input[type="range"]::-moz-range-thumb {
   }
 
   /* -----------------------------------------------
+     Settings (Offline / Live toggle)
+     ----------------------------------------------- */
+
+  function updateSettingsUI(data) {
+    const offline = data.offline_mode;
+    dom.offlineToggle.checked = offline;
+
+    if (offline) {
+      dom.modeLabel.textContent = 'Offline Mode';
+      dom.modeSublabel.textContent = 'Use locally cached models only';
+      dom.modeBadge.textContent = 'Offline';
+      dom.modeBadge.className = 'mode-badge offline';
+      dom.settingsNote.textContent = 'Models loaded from local cache. Toggle off to download from HuggingFace.';
+    } else {
+      dom.modeLabel.textContent = 'Live Mode';
+      dom.modeSublabel.textContent = 'Download models from HuggingFace';
+      dom.modeBadge.textContent = 'Live';
+      dom.modeBadge.className = 'mode-badge live';
+      dom.settingsNote.textContent = 'Models will be downloaded on first use. Toggle on to use local cache only.';
+    }
+
+    if (!data.has_local_models) {
+      dom.settingsNote.textContent += ' No local models found — run download_models.py first for offline mode.';
+    }
+  }
+
+  async function loadSettings() {
+    try {
+      const resp = await fetch('/api/settings');
+      if (resp.ok) {
+        const data = await resp.json();
+        updateSettingsUI(data);
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function toggleOfflineMode(enabled) {
+    try {
+      const body = new FormData();
+      body.append('offline_mode', enabled);
+      const resp = await fetch('/api/settings', { method: 'POST', body });
+      if (resp.ok) {
+        const data = await resp.json();
+        updateSettingsUI(data);
+        showToast(enabled ? 'Switched to Offline mode' : 'Switched to Live mode', 'success');
+      } else {
+        showToast('Failed to update settings', 'error');
+        // Revert the toggle
+        dom.offlineToggle.checked = !enabled;
+      }
+    } catch {
+      showToast('Failed to update settings', 'error');
+      dom.offlineToggle.checked = !enabled;
+    }
+  }
+
+  function initSettings() {
+    // Toggle dropdown on gear click
+    dom.settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dom.settingsDropdown.classList.toggle('open');
+    });
+
+    // Prevent dropdown clicks from closing it
+    dom.settingsDropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+      dom.settingsDropdown.classList.remove('open');
+    });
+
+    // Toggle handler
+    dom.offlineToggle.addEventListener('change', () => {
+      toggleOfflineMode(dom.offlineToggle.checked);
+    });
+
+    // Load initial settings
+    loadSettings();
+  }
+
+  /* -----------------------------------------------
      Initialize
      ----------------------------------------------- */
   function init() {
@@ -3304,6 +3546,7 @@ input[type="range"]::-moz-range-thumb {
     initTTS();
     initVoiceChanger();
     initSidebar();
+    initSettings();
 
     dom.startReplacementBtn.addEventListener('click', handleStartReplacement);
     dom.newJobBtn.addEventListener('click', resetToUpload);

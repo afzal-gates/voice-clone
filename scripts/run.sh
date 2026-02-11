@@ -16,5 +16,10 @@ fi
 # Ensure UTF-8 output (required for IndicF5 Unicode text logging)
 export PYTHONIOENCODING=utf-8
 
+# Use local models if models/ directory exists
+if [ -d "models/huggingface" ] && [ -z "$MODELS_DIR" ]; then
+    export MODELS_DIR=models
+fi
+
 echo "Starting VoiceClone AI server..."
 python run.py

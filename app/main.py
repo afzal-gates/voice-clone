@@ -225,6 +225,35 @@ async def health_check() -> dict:
     }
 
 
+@app.get("/api/settings")
+async def get_settings() -> dict:
+    """Return current application settings (mode, models directory, etc.)."""
+    return {
+        "offline_mode": settings.OFFLINE_MODE,
+        "models_dir": settings.MODELS_DIR,
+        "has_local_models": settings.has_local_models(),
+    }
+
+
+@app.post("/api/settings")
+async def update_settings(
+    offline_mode: bool = Form(...),
+) -> dict:
+    """Update application settings at runtime.
+
+    Args:
+        offline_mode: ``True`` to use only local cached models,
+                      ``False`` to allow downloading from HuggingFace.
+    """
+    settings.set_offline_mode(offline_mode)
+    logger.info("Settings updated: offline_mode=%s", offline_mode)
+    return {
+        "offline_mode": settings.OFFLINE_MODE,
+        "models_dir": settings.MODELS_DIR,
+        "has_local_models": settings.has_local_models(),
+    }
+
+
 @app.get("/api/tts-models")
 async def list_tts_models() -> list[dict]:
     """Return the available TTS models with metadata."""

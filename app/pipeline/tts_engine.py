@@ -71,6 +71,47 @@ class TTSEngine:
         )
 
     # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _resolve_to_local(model_id: str) -> str:
+        """Resolve a HF model ID to its local cache snapshot path.
+
+        When models have been pre-downloaded (``MODELS_DIR`` is set),
+        ``from_pretrained`` must receive a *local directory path* rather
+        than a remote repo ID.  Passing a directory makes the
+        ``transformers`` library skip network calls (e.g. the
+        ``model_info`` check inside ``_patch_mistral_regex``).
+
+        Scans the HF cache directory structure directly to avoid any
+        network calls that ``snapshot_download`` might trigger even
+        with ``local_files_only=True`` when ``HF_HUB_OFFLINE=1``.
+
+        Returns the local path when found in cache, or *model_id*
+        unchanged when no local copy exists.
+        """
+        import os as _os
+        hf_home = _os.environ.get("HF_HOME", "")
+        if not hf_home:
+            return model_id
+
+        # HF cache structure: {HF_HOME}/hub/models--{org}--{name}/snapshots/{hash}/
+        cache_dir_name = "models--" + model_id.replace("/", "--")
+        snapshots_dir = Path(hf_home) / "hub" / cache_dir_name / "snapshots"
+        if not snapshots_dir.is_dir():
+            return model_id
+
+        # Pick the first (usually only) snapshot hash directory
+        snapshot_dirs = [d for d in snapshots_dir.iterdir() if d.is_dir()]
+        if snapshot_dirs:
+            resolved = str(snapshot_dirs[0])
+            logger.info("Resolved %s -> %s", model_id, resolved)
+            return resolved
+
+        return model_id
+
+    # ------------------------------------------------------------------
     # Lazy model loading
     # ------------------------------------------------------------------
 
@@ -98,8 +139,9 @@ class TTSEngine:
                 except ImportError:
                     logger.info("FlashAttention2 not installed — using default attention")
 
+            model_path = self._resolve_to_local(settings.QWEN_TTS_MODEL)
             self._qwen_model = Qwen3TTSModel.from_pretrained(
-                settings.QWEN_TTS_MODEL,
+                model_path,
                 **load_kwargs,
             )
             logger.info("Qwen3-TTS model loaded successfully")
@@ -124,8 +166,9 @@ class TTSEngine:
         try:
             from transformers import VitsModel, AutoTokenizer  # noqa: WPS433
 
-            self._mms_tokenizer = AutoTokenizer.from_pretrained(settings.MMS_TTS_MODEL)
-            self._mms_model = VitsModel.from_pretrained(settings.MMS_TTS_MODEL).to(self._device)
+            model_path = self._resolve_to_local(settings.MMS_TTS_MODEL)
+            self._mms_tokenizer = AutoTokenizer.from_pretrained(model_path)
+            self._mms_model = VitsModel.from_pretrained(model_path).to(self._device)
             logger.info("MMS-TTS model loaded successfully")
 
         except ImportError:

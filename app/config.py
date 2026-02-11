@@ -44,6 +44,17 @@ class Settings:
     """
 
     def __init__(self) -> None:
+        # --- Offline models (must be set before any HF/torch imports) ---
+        self.MODELS_DIR: str = os.getenv("MODELS_DIR", "")
+        if self.MODELS_DIR:
+            models_path = Path(self.MODELS_DIR).resolve()
+            os.environ.setdefault("HF_HOME", str(models_path / "huggingface"))
+            os.environ.setdefault("TORCH_HOME", str(models_path / "torch"))
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
+        # Runtime mode: "offline" uses local cache only; "live" allows downloads
+        self.OFFLINE_MODE: bool = os.environ.get("HF_HUB_OFFLINE", "") == "1"
+
         # --- Application ---
         self.APP_NAME: str = os.getenv("APP_NAME", "VoiceClone AI")
         self.APP_VERSION: str = os.getenv("APP_VERSION", "1.0.0")
@@ -102,6 +113,26 @@ class Settings:
         self.UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
         self.JOBS_DIR.mkdir(parents=True, exist_ok=True)
         self.VOICES_DIR.mkdir(parents=True, exist_ok=True)
+
+    def set_offline_mode(self, enabled: bool) -> None:
+        """Toggle offline mode at runtime.
+
+        When enabled, ``HF_HUB_OFFLINE=1`` is set in ``os.environ`` so that
+        ``huggingface_hub`` refuses all network requests.  When disabled the
+        variable is removed, allowing model downloads on demand.
+        """
+        self.OFFLINE_MODE = enabled
+        if enabled:
+            os.environ["HF_HUB_OFFLINE"] = "1"
+        else:
+            os.environ.pop("HF_HUB_OFFLINE", None)
+
+    def has_local_models(self) -> bool:
+        """Return ``True`` if a populated local model cache exists."""
+        if not self.MODELS_DIR:
+            return False
+        hf_hub = Path(self.MODELS_DIR).resolve() / "huggingface" / "hub"
+        return hf_hub.is_dir() and any(hf_hub.iterdir())
 
     def __repr__(self) -> str:
         return (

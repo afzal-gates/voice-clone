@@ -1,0 +1,9 @@
+# PyTorch CPU-only (Linux without GPU / macOS Intel)
+# Install first:  pip install -r requirements-cpu.txt
+# Then:           pip install -r requirements.txt
+#
+# Apple Silicon (M1/M2/M3/M4): use plain "pip install torch torchaudio"
+# instead — the default PyPI build includes MPS acceleration.
+--index-url https://download.pytorch.org/whl/cpu
+torch>=2.1.0
+torchaudio>=2.1.0

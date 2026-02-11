@@ -7,6 +7,7 @@ optionally muxes the final audio back into the original video container.
 
 import asyncio
 import logging
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -259,18 +260,15 @@ class AudioMerger:
             output_path.name,
         )
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        result = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True,
         )
-        stdout, stderr = await process.communicate()
 
-        if process.returncode != 0:
-            stderr_text = stderr.decode(errors="replace").strip()
-            logger.error("FFmpeg video rebuild failed (rc=%d): %s", process.returncode, stderr_text)
+        if result.returncode != 0:
+            stderr_text = result.stderr.decode(errors="replace").strip()
+            logger.error("FFmpeg video rebuild failed (rc=%d): %s", result.returncode, stderr_text)
             raise RuntimeError(
-                f"FFmpeg video rebuild failed with exit code {process.returncode}: {stderr_text}"
+                f"FFmpeg video rebuild failed with exit code {result.returncode}: {stderr_text}"
             )
 
         logger.info("Video rebuild complete: %s", output_path.name)
@@ -323,16 +321,13 @@ class AudioMerger:
         logger.info("Exporting MP3: %s -> %s", wav_path.name, mp3_path.name)
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            result = await asyncio.to_thread(
+                subprocess.run, cmd, capture_output=True,
             )
-            stdout, stderr = await process.communicate()
 
-            if process.returncode != 0:
-                stderr_text = stderr.decode(errors="replace").strip()
-                logger.warning("MP3 export failed (rc=%d): %s", process.returncode, stderr_text)
+            if result.returncode != 0:
+                stderr_text = result.stderr.decode(errors="replace").strip()
+                logger.warning("MP3 export failed (rc=%d): %s", result.returncode, stderr_text)
             else:
                 results["mp3"] = mp3_path
                 logger.info("MP3 export complete: %s", mp3_path.name)

@@ -7,6 +7,7 @@ and format conversion for the VoiceClone AI pipeline.
 import asyncio
 import json
 import logging
+import subprocess
 from pathlib import Path
 
 from app.config import settings
@@ -95,18 +96,15 @@ class AudioExtractor:
             settings.SAMPLE_RATE,
         )
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        result = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True,
         )
-        stdout, stderr = await process.communicate()
 
-        if process.returncode != 0:
-            stderr_text = stderr.decode(errors="replace").strip()
-            logger.error("FFmpeg extraction failed (rc=%d): %s", process.returncode, stderr_text)
+        if result.returncode != 0:
+            stderr_text = result.stderr.decode(errors="replace").strip()
+            logger.error("FFmpeg extraction failed (rc=%d): %s", result.returncode, stderr_text)
             raise RuntimeError(
-                f"FFmpeg audio extraction failed with exit code {process.returncode}: {stderr_text}"
+                f"FFmpeg audio extraction failed with exit code {result.returncode}: {stderr_text}"
             )
 
         logger.info("Audio extraction complete: %s", output_path.name)
@@ -154,22 +152,19 @@ class AudioExtractor:
 
         logger.debug("Probing media: %s", file_path.name)
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        result = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True,
         )
-        stdout, stderr = await process.communicate()
 
-        if process.returncode != 0:
-            stderr_text = stderr.decode(errors="replace").strip()
-            logger.error("FFprobe failed (rc=%d): %s", process.returncode, stderr_text)
+        if result.returncode != 0:
+            stderr_text = result.stderr.decode(errors="replace").strip()
+            logger.error("FFprobe failed (rc=%d): %s", result.returncode, stderr_text)
             raise RuntimeError(
-                f"FFprobe failed with exit code {process.returncode}: {stderr_text}"
+                f"FFprobe failed with exit code {result.returncode}: {stderr_text}"
             )
 
         try:
-            probe_data = json.loads(stdout.decode())
+            probe_data = json.loads(result.stdout.decode())
         except json.JSONDecodeError as exc:
             logger.error("Failed to parse FFprobe JSON output: %s", exc)
             raise RuntimeError(f"FFprobe returned invalid JSON: {exc}") from exc
@@ -228,18 +223,15 @@ class AudioExtractor:
             target_sr,
         )
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        result = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True,
         )
-        stdout, stderr = await process.communicate()
 
-        if process.returncode != 0:
-            stderr_text = stderr.decode(errors="replace").strip()
-            logger.error("FFmpeg conversion failed (rc=%d): %s", process.returncode, stderr_text)
+        if result.returncode != 0:
+            stderr_text = result.stderr.decode(errors="replace").strip()
+            logger.error("FFmpeg conversion failed (rc=%d): %s", result.returncode, stderr_text)
             raise RuntimeError(
-                f"FFmpeg audio conversion failed with exit code {process.returncode}: {stderr_text}"
+                f"FFmpeg audio conversion failed with exit code {result.returncode}: {stderr_text}"
             )
 
         logger.info("Audio conversion complete: %s", output_path.name)

@@ -340,3 +340,51 @@ class SpeechTranscriber:
         )
 
         return full_text, word_segments
+
+    # ------------------------------------------------------------------
+    # Buffer transcription (for real-time voice changer)
+    # ------------------------------------------------------------------
+
+    async def transcribe_buffer(self, audio: np.ndarray, sr: int) -> str:
+        """Transcribe a short audio buffer and return the text.
+
+        Useful for real-time voice changer where audio arrives as in-memory
+        numpy arrays rather than files on disk.
+
+        Args:
+            audio: 1-D float32 numpy array of audio samples.
+            sr:    Sample rate of *audio* (resampled to 16 kHz internally).
+
+        Returns:
+            The transcribed text, or an empty string if no speech was found.
+        """
+        self._ensure_model()
+
+        def _run() -> str:
+            buf = audio
+            if sr != 16000:
+                import librosa  # noqa: WPS433
+                buf = librosa.resample(buf, orig_sr=sr, target_sr=16000)
+
+            with tempfile.NamedTemporaryFile(
+                suffix=".wav", delete=False,
+            ) as tmp:
+                tmp_path = Path(tmp.name)
+
+            try:
+                sf.write(str(tmp_path), buf, 16000)
+                segments_iter, _ = self._model.transcribe(
+                    str(tmp_path), beam_size=5, vad_filter=True,
+                )
+                return " ".join(seg.text for seg in segments_iter).strip()
+            finally:
+                try:
+                    tmp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
+        try:
+            return await asyncio.to_thread(_run)
+        except Exception as exc:
+            logger.warning("Buffer transcription failed: %s", exc)
+            return ""

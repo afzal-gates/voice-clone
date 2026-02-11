@@ -1,12 +1,28 @@
+# ============================================================
+# VoiceClone AI - Python Dependencies
+# ============================================================
+#
+# Install PyTorch FIRST using a platform-specific file:
+#   NVIDIA GPU (Windows/Linux):  pip install -r requirements-cuda.txt
+#   CPU only (Linux / macOS Intel): pip install -r requirements-cpu.txt
+#   Apple Silicon (macOS M1+):   pip install torch torchaudio
+#
+# Then install everything else:
+#   pip install -r requirements.txt
+# ============================================================
+
+# Web Framework
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 pydantic>=2.5.0
 python-dotenv>=1.0.0
-torch>=2.1.0
-torchaudio>=2.1.0
+
+# Core ML
 transformers>=4.36.0
 accelerate>=0.25.0
+
+# Audio & Speech
 pyannote.audio>=3.1.0
 demucs>=4.0.0
 faster-whisper>=0.10.0
@@ -15,6 +31,26 @@ librosa>=0.10.1
 numpy>=1.24.0
 scipy>=1.11.0
 pydub>=0.25.1
+
+# File I/O
 aiofiles>=23.2.1
+
+# Hugging Face
 huggingface-hub>=0.20.0
+safetensors>=0.4.0
+
+# TTS - Qwen3
 qwen-tts>=0.1.0
+
+# TTS - IndicF5 (f5-tts installed without its own deps to avoid conflicts)
+f5-tts
+vocos>=0.1.0
+x-transformers>=1.0.0
+torchdiffeq>=0.2.3
+ema-pytorch>=0.2.0
+pypinyin>=0.50.0
+jieba>=0.42.1
+cached-path>=1.3.0
+
+# FFmpeg binary (bundled fallback when system FFmpeg is not on PATH)
+imageio-ffmpeg>=0.4.9

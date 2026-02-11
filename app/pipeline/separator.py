@@ -7,6 +7,7 @@ stems, enabling downstream processing on clean speech signals.
 import asyncio
 import logging
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -196,21 +197,18 @@ class AudioSeparator:
             str(audio_path),
         ]
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        result = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True,
         )
-        stdout, stderr = await process.communicate()
 
-        if process.returncode != 0:
-            stderr_text = stderr.decode(errors="replace").strip()
+        if result.returncode != 0:
+            stderr_text = result.stderr.decode(errors="replace").strip()
             logger.error(
-                "Demucs CLI failed (rc=%d): %s", process.returncode, stderr_text,
+                "Demucs CLI failed (rc=%d): %s", result.returncode, stderr_text,
             )
             raise RuntimeError(
                 f"Demucs CLI separation failed with exit code "
-                f"{process.returncode}: {stderr_text}"
+                f"{result.returncode}: {stderr_text}"
             )
 
         # Demucs CLI writes to: output_dir/{model}/{stem}/{vocals.wav, no_vocals.wav}

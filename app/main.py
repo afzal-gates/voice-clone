@@ -6,12 +6,17 @@ TTS, and downloading results.
 """
 
 import asyncio
+import io
+import json
 import logging
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+import numpy as np
+
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -223,7 +228,7 @@ async def health_check() -> dict:
 @app.get("/api/tts-models")
 async def list_tts_models() -> list[dict]:
     """Return the available TTS models with metadata."""
-    from app.pipeline.tts_engine import MODEL_QWEN, MODEL_MMS
+    from app.pipeline.tts_engine import MODEL_QWEN, MODEL_MMS, MODEL_INDICF5
 
     return [
         {
@@ -231,7 +236,10 @@ async def list_tts_models() -> list[dict]:
             "name": "Qwen3-TTS",
             "description": "Multilingual TTS with voice cloning",
             "supports_cloning": True,
-            "languages": ["English", "Bengali", "Chinese", "Japanese", "Korean"],
+            "languages": [
+                "Chinese", "English", "French", "German", "Italian",
+                "Japanese", "Korean", "Portuguese", "Russian", "Spanish",
+            ],
         },
         {
             "id": MODEL_MMS,
@@ -239,6 +247,16 @@ async def list_tts_models() -> list[dict]:
             "description": "Bengali text-to-speech (no voice cloning)",
             "supports_cloning": False,
             "languages": ["Bengali"],
+        },
+        {
+            "id": MODEL_INDICF5,
+            "name": "IndicF5",
+            "description": "Indian languages TTS with voice cloning (Bengali, Hindi, Tamil, Telugu + 7 more)",
+            "supports_cloning": True,
+            "languages": [
+                "Assamese", "Bengali", "Gujarati", "Hindi", "Kannada",
+                "Malayalam", "Marathi", "Odia", "Punjabi", "Tamil", "Telugu",
+            ],
         },
     ]
 
@@ -513,12 +531,14 @@ async def text_to_speech(
     tts_model: str | None = Form(default=None),
     speed: float = Form(default=1.0),
     pitch: float = Form(default=1.0),
+    ref_text: str | None = Form(default=None),
 ) -> TTSResponse:
     """Synthesise speech from text with optional voice cloning.
 
     Provide either *voice_id* (a saved voice profile) or *reference_audio*
     (a one-time upload) to clone a voice.  If neither is given the default
-    TTS voice is used.  Voice cloning is only available with Qwen3-TTS.
+    TTS voice is used.  Voice cloning is available with Qwen3-TTS and
+    IndicF5.
 
     Args:
         text:            The text to synthesise.
@@ -526,10 +546,12 @@ async def text_to_speech(
         voice_id:        Optional saved voice profile ID.
         language:        Language for synthesis (e.g. "English", "Bengali").
                          ``None`` for auto-detection from text.
-        tts_model:       TTS model to use (``qwen3-tts`` or ``mms-tts-ben``).
-                         ``None`` defaults to ``qwen3-tts``.
+        tts_model:       TTS model to use (``qwen3-tts``, ``mms-tts-ben``,
+                         or ``indicf5``).  ``None`` defaults to ``qwen3-tts``.
         speed:           Playback speed multiplier (0.5 -- 2.0).
         pitch:           Pitch shift multiplier (0.5 -- 2.0).
+        ref_text:        Transcript of the reference audio (recommended for
+                         IndicF5, optional for Qwen3-TTS).
 
     Raises:
         HTTPException: 400 on invalid parameters, 404 if voice_id not found.
@@ -562,9 +584,28 @@ async def text_to_speech(
         await _save_upload(reference_audio, ref_path)
 
     # Normalize model name
-    from app.pipeline.tts_engine import MODEL_QWEN, MODEL_MMS, AVAILABLE_MODELS
+    from app.pipeline.tts_engine import MODEL_QWEN, MODEL_MMS, MODEL_INDICF5, AVAILABLE_MODELS
 
     resolved_model = tts_model if tts_model in AVAILABLE_MODELS else MODEL_QWEN
+
+    # Qwen3-TTS and IndicF5 require a reference voice
+    if resolved_model == MODEL_QWEN and ref_path is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Qwen3-TTS requires a reference voice. "
+                "Please select a saved voice or upload a reference audio file, "
+                "or switch to Meta MMS-TTS Bengali for plain text-to-speech."
+            ),
+        )
+    if resolved_model == MODEL_INDICF5 and ref_path is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "IndicF5 requires a reference voice for voice cloning. "
+                "Please upload a reference audio file or select a saved voice."
+            ),
+        )
 
     logger.info(
         "TTS request: job=%s text_len=%d speed=%.1f pitch=%.1f ref=%s model=%s",
@@ -579,6 +620,9 @@ async def text_to_speech(
     # Normalize language: empty string or "auto" means auto-detect
     tts_language = language if language and language.lower() != "auto" else None
 
+    # Normalize ref_text: empty string means no transcript
+    resolved_ref_text = ref_text.strip() if ref_text and ref_text.strip() else None
+
     _launch_background_task(
         orchestrator.process_tts(
             job_id=job.job_id,
@@ -588,6 +632,7 @@ async def text_to_speech(
             pitch=pitch,
             language=tts_language,
             tts_model=resolved_model,
+            ref_text=resolved_ref_text,
         )
     )
 
@@ -811,3 +856,148 @@ async def create_voice_from_job(
 
     voice = voice_manager.get_voice(voice.voice_id)
     return VoiceProfileResponse(**voice.model_dump())
+
+
+# -- Real-time voice changer ------------------------------------------------
+
+
+def _decode_audio_blob(blob: bytes) -> tuple[np.ndarray, int]:
+    """Decode a WebM/Opus audio blob from the browser into a numpy array.
+
+    Uses pydub (which delegates to FFmpeg) to handle the WebM container,
+    then converts to mono 16 kHz float32 for Whisper consumption.
+    """
+    from pydub import AudioSegment  # noqa: WPS433
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            suffix=".webm", delete=False,
+        ) as tmp:
+            tmp.write(blob)
+            tmp_path = Path(tmp.name)
+
+        seg = AudioSegment.from_file(str(tmp_path))
+        seg = seg.set_channels(1).set_frame_rate(16000).set_sample_width(2)
+        samples = np.array(seg.get_array_of_samples(), dtype=np.float32) / 32768.0
+        return samples, 16000
+    finally:
+        if tmp_path is not None:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def _encode_wav_bytes(audio: np.ndarray, sr: int) -> bytes:
+    """Encode a numpy audio array to in-memory WAV bytes."""
+    buf = io.BytesIO()
+    import soundfile as sf  # noqa: WPS433
+    sf.write(buf, audio, sr, format="WAV")
+    return buf.getvalue()
+
+
+@app.websocket("/ws/voice-changer")
+async def voice_changer_ws(websocket: WebSocket) -> None:
+    """Real-time voice changer via WebSocket.
+
+    Protocol
+    --------
+    1. Client sends JSON config: ``{voice_id, tts_model, ref_text, language}``
+    2. Server validates and replies ``{status: "ready"}``.
+    3. Client sends binary audio blobs (WebM from MediaRecorder, ~3 s each).
+    4. Server transcribes, synthesises, and sends back WAV bytes.
+    5. Client sends ``{action: "stop"}`` to end the session.
+    """
+    await websocket.accept()
+    logger.info("Voice changer WebSocket connected")
+
+    try:
+        # ---- 1. Receive configuration ------------------------------------
+        config = await websocket.receive_json()
+        voice_id: str = config.get("voice_id", "")
+        tts_model: str = config.get("tts_model", "qwen3-tts")
+        ref_text: str | None = config.get("ref_text") or None
+        language: str | None = config.get("language") or None
+
+        ref_path = voice_manager.get_audio_path(voice_id)
+        if ref_path is None:
+            await websocket.send_json({"error": f"Voice not found: {voice_id}"})
+            await websocket.close()
+            return
+
+        await websocket.send_json({"status": "ready"})
+        logger.info(
+            "Voice changer session: voice=%s model=%s", voice_id, tts_model,
+        )
+
+        # ---- 2. Process audio chunks in a loop ----------------------------
+        while True:
+            message = await websocket.receive()
+
+            # JSON control messages
+            if "text" in message:
+                data = json.loads(message["text"])
+                if data.get("action") == "stop":
+                    logger.info("Voice changer stopped by client")
+                    break
+                continue
+
+            # Binary audio blobs
+            if "bytes" not in message:
+                continue
+
+            try:
+                # Decode browser audio
+                audio, sr = await asyncio.to_thread(
+                    _decode_audio_blob, message["bytes"],
+                )
+
+                # Transcribe
+                await websocket.send_json({"status": "transcribing"})
+                text = await orchestrator.transcriber.transcribe_buffer(audio, sr)
+                if not text.strip():
+                    await websocket.send_json({"status": "no_speech"})
+                    continue
+
+                await websocket.send_json({
+                    "status": "synthesizing", "text": text,
+                })
+
+                # Synthesize with the selected TTS model
+                from app.pipeline.tts_engine import (  # noqa: WPS433
+                    MODEL_QWEN, MODEL_MMS, MODEL_INDICF5,
+                )
+
+                tts = orchestrator.tts_engine
+                ref_str = str(ref_path)
+
+                if tts_model == MODEL_MMS:
+                    synth, synth_sr = await asyncio.to_thread(
+                        tts._synthesize_mms, text,
+                    )
+                elif tts_model == MODEL_INDICF5:
+                    synth, synth_sr = await asyncio.to_thread(
+                        tts._synthesize_indicf5, text, ref_str, ref_text,
+                    )
+                else:
+                    synth, synth_sr = await asyncio.to_thread(
+                        tts._synthesize_qwen, text, ref_str, ref_text, language,
+                    )
+
+                # Send synthesised audio back
+                wav_bytes = _encode_wav_bytes(synth, synth_sr)
+                await websocket.send_bytes(wav_bytes)
+                await websocket.send_json({"status": "chunk_done"})
+
+            except Exception as exc:
+                logger.error("Voice changer chunk error: %s", exc)
+                try:
+                    await websocket.send_json({"error": str(exc)})
+                except Exception:
+                    break
+
+    except WebSocketDisconnect:
+        logger.info("Voice changer WebSocket disconnected")
+    except Exception as exc:
+        logger.error("Voice changer WebSocket error: %s", exc)

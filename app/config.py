@@ -68,6 +68,7 @@ class Settings:
         # --- TTS ---
         self.QWEN_TTS_MODEL: str = os.getenv("QWEN_TTS_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-Base")
         self.MMS_TTS_MODEL: str = os.getenv("MMS_TTS_MODEL", "facebook/mms-tts-ben")
+        self.INDICF5_MODEL: str = os.getenv("INDICF5_MODEL", "ai4bharat/IndicF5")
 
         # --- Diarization ---
         self.PYANNOTE_MODEL: str = os.getenv(

@@ -339,6 +339,7 @@ class PipelineOrchestrator:
         pitch: float = 1.0,
         language: str | None = None,
         tts_model: str | None = None,
+        ref_text: str | None = None,
     ) -> Path:
         """Run a simple text-to-speech synthesis without the full pipeline.
 
@@ -350,7 +351,9 @@ class PipelineOrchestrator:
             pitch:          Pitch shift multiplier.
             language:       Explicit language (e.g. "English", "Bengali").
                             ``None`` for auto-detection.
-            tts_model:      TTS model identifier (e.g. "qwen3-tts", "mms-tts-ben").
+            tts_model:      TTS model identifier (e.g. "qwen3-tts",
+                            "mms-tts-ben", "indicf5").
+            ref_text:       Transcript of the reference audio (for IndicF5).
                             ``None`` defaults to Qwen3-TTS.
 
         Returns:
@@ -384,6 +387,7 @@ class PipelineOrchestrator:
                 pitch=pitch,
                 language=language,
                 tts_model=model,
+                ref_text=ref_text,
             )
 
             # Export to MP3 as well.

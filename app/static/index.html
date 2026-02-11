@@ -398,6 +398,81 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* ============================================================
+   Voice Changer
+   ============================================================ */
+.vc-status {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.vc-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.vc-dot.ready      { background: var(--text-secondary); }
+.vc-dot.listening   { background: var(--success); animation: vcPulse 1.2s ease infinite; }
+.vc-dot.processing  { background: var(--warning, #f59e0b); animation: vcPulse 0.8s ease infinite; }
+.vc-dot.error       { background: var(--error); }
+
+@keyframes vcPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
+}
+
+.vc-transcript {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+  margin-bottom: 1rem;
+  min-height: 3.5rem;
+  max-height: 10rem;
+  overflow-y: auto;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.vc-transcript .chunk {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.vc-transcript .chunk:last-child {
+  border-bottom: none;
+}
+
+.vc-waveform {
+  width: 100%;
+  height: 60px;
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.btn-lg {
+  padding: 0.875rem 1.5rem;
+  font-size: 1.0625rem;
+}
+
+.btn-recording {
+  background: var(--error) !important;
+  animation: vcPulse 1.2s ease infinite;
+}
+
+/* ============================================================
    Progress Bar
    ============================================================ */
 .progress-bar {
@@ -1273,6 +1348,7 @@ input[type="range"]::-moz-range-thumb {
       <nav class="tab-nav" role="tablist" aria-label="Main sections">
         <button class="tab-btn" role="tab" id="tabReplace" aria-selected="true" aria-controls="panelReplace" tabindex="0">Voice Replace</button>
         <button class="tab-btn" role="tab" id="tabTTS" aria-selected="false" aria-controls="panelTTS" tabindex="-1">Text to Speech</button>
+        <button class="tab-btn" role="tab" id="tabVoiceChanger" aria-selected="false" aria-controls="panelVoiceChanger" tabindex="-1">Voice Changer</button>
       </nav>
 
       <!-- ================================================
@@ -1395,7 +1471,7 @@ input[type="range"]::-moz-range-thumb {
             </div>
 
             <div class="form-group" id="ttsVoiceGroup">
-              <label>Reference Voice (optional — Qwen3-TTS only)</label>
+              <label>Reference Voice (required for Qwen3-TTS)</label>
               <div class="voice-select-wrapper">
                 <select id="ttsVoiceSelect" aria-label="Select a saved voice">
                   <option value="">-- No saved voice --</option>
@@ -1425,6 +1501,7 @@ input[type="range"]::-moz-range-thumb {
               <select id="ttsModelSelect" aria-label="Select TTS model">
                 <option value="qwen3-tts">Qwen3-TTS (Multilingual + Voice Cloning)</option>
                 <option value="mms-tts-ben">Meta MMS-TTS Bengali</option>
+                <option value="indicf5">IndicF5 (Indian Languages + Voice Cloning)</option>
               </select>
               <small class="model-hint" id="ttsModelHint"></small>
             </div>
@@ -1433,9 +1510,37 @@ input[type="range"]::-moz-range-thumb {
               <label for="ttsLanguage">Language</label>
               <select id="ttsLanguage" aria-label="Select language for synthesis">
                 <option value="auto">Auto-detect</option>
-                <option value="English">English</option>
-                <option value="Bengali">Bangla (Bengali)</option>
+                <optgroup label="Qwen3-TTS Languages">
+                  <option value="Chinese">Chinese</option>
+                  <option value="English">English</option>
+                  <option value="French">French</option>
+                  <option value="German">German</option>
+                  <option value="Italian">Italian</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Korean">Korean</option>
+                  <option value="Portuguese">Portuguese</option>
+                  <option value="Russian">Russian</option>
+                  <option value="Spanish">Spanish</option>
+                </optgroup>
+                <optgroup label="IndicF5 Languages">
+                  <option value="Assamese">Assamese</option>
+                  <option value="Bengali">Bengali (Bangla)</option>
+                  <option value="Gujarati">Gujarati</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Kannada">Kannada</option>
+                  <option value="Malayalam">Malayalam</option>
+                  <option value="Marathi">Marathi</option>
+                  <option value="Odia">Odia</option>
+                  <option value="Punjabi">Punjabi</option>
+                  <option value="Tamil">Tamil</option>
+                  <option value="Telugu">Telugu</option>
+                </optgroup>
               </select>
+            </div>
+
+            <div class="form-group hidden" id="ttsRefTextGroup">
+              <label for="ttsRefText">Reference Audio Transcript <small>(recommended for IndicF5)</small></label>
+              <textarea id="ttsRefText" rows="2" placeholder="Type what is spoken in the reference audio..." aria-label="Transcript of the reference voice audio"></textarea>
             </div>
 
             <div class="slider-row">
@@ -1484,6 +1589,65 @@ input[type="range"]::-moz-range-thumb {
           </div>
         </div>
       </section>
+
+      <!-- ================================================
+           VOICE CHANGER TAB
+           ================================================ -->
+      <section class="tab-panel" id="panelVoiceChanger" role="tabpanel" aria-labelledby="tabVoiceChanger">
+        <div class="card">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            Real-Time Voice Changer
+          </div>
+          <p style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:1.25rem;">
+            Speak into your microphone and hear your voice converted to a selected reference voice.
+          </p>
+
+          <!-- Voice selection -->
+          <div class="form-group">
+            <label for="vcVoiceSelect">Reference Voice</label>
+            <select id="vcVoiceSelect" class="form-control" required>
+              <option value="">Select a saved voice...</option>
+            </select>
+          </div>
+
+          <!-- Model selection -->
+          <div class="form-group">
+            <label for="vcModelSelect">TTS Model</label>
+            <select id="vcModelSelect" class="form-control">
+              <option value="indicf5">IndicF5 (Indian Languages)</option>
+              <option value="qwen3-tts">Qwen3-TTS (Multilingual)</option>
+              <option value="mms-tts-ben">MMS-TTS Bengali</option>
+            </select>
+          </div>
+
+          <!-- Reference text (for IndicF5) -->
+          <div class="form-group" id="vcRefTextGroup">
+            <label for="vcRefText">Reference Text <span style="color:var(--text-secondary);font-weight:400;">(transcript of reference audio)</span></label>
+            <textarea id="vcRefText" class="form-control" rows="2" placeholder="Enter what is spoken in the reference audio..."></textarea>
+          </div>
+
+          <!-- Waveform visualization -->
+          <canvas class="vc-waveform" id="vcWaveform" width="600" height="60" aria-label="Microphone waveform"></canvas>
+
+          <!-- Status -->
+          <div class="vc-status">
+            <span class="vc-dot ready" id="vcStatusDot"></span>
+            <span id="vcStatus">Ready</span>
+          </div>
+
+          <!-- Live transcript -->
+          <div class="vc-transcript" id="vcTranscript" aria-live="polite">
+            <span style="color:var(--text-secondary);font-style:italic;">Transcriptions will appear here...</span>
+          </div>
+
+          <!-- Start / Stop button -->
+          <button class="btn btn-primary btn-lg" id="vcStartBtn" style="width:100%;">
+            Start Voice Changer
+          </button>
+        </div>
+      </section>
+
     </main>
 
     <!-- ====================================================
@@ -1565,8 +1729,10 @@ input[type="range"]::-moz-range-thumb {
     statusLabel:     $('#statusLabel'),
     tabReplace:      $('#tabReplace'),
     tabTTS:          $('#tabTTS'),
+    tabVoiceChanger: $('#tabVoiceChanger'),
     panelReplace:    $('#panelReplace'),
     panelTTS:        $('#panelTTS'),
+    panelVoiceChanger: $('#panelVoiceChanger'),
     uploadCard:      $('#uploadCard'),
     uploadZone:      $('#uploadZone'),
     fileInput:       $('#fileInput'),
@@ -1601,6 +1767,8 @@ input[type="range"]::-moz-range-thumb {
     ttsModelHint:    $('#ttsModelHint'),
     ttsVoiceGroup:   null, // set after DOM ready
     ttsLanguage:     $('#ttsLanguage'),
+    ttsRefText:      $('#ttsRefText'),
+    ttsRefTextGroup: $('#ttsRefTextGroup'),
     ttsSpeed:        $('#ttsSpeed'),
     ttsSpeedVal:     $('#ttsSpeedVal'),
     ttsPitch:        $('#ttsPitch'),
@@ -1620,6 +1788,15 @@ input[type="range"]::-moz-range-thumb {
     jobList:         $('#jobList'),
     jobsEmpty:       $('#jobsEmpty'),
     toastContainer:  $('#toastContainer'),
+    vcVoiceSelect:   $('#vcVoiceSelect'),
+    vcModelSelect:   $('#vcModelSelect'),
+    vcRefText:       $('#vcRefText'),
+    vcRefTextGroup:  $('#vcRefTextGroup'),
+    vcStatus:        $('#vcStatus'),
+    vcStatusDot:     $('#vcStatusDot'),
+    vcTranscript:    $('#vcTranscript'),
+    vcWaveform:      $('#vcWaveform'),
+    vcStartBtn:      $('#vcStartBtn'),
   };
 
   /* -----------------------------------------------
@@ -1774,8 +1951,8 @@ input[type="range"]::-moz-range-thumb {
      Tab Management
      ----------------------------------------------- */
   function initTabs() {
-    const tabs = [dom.tabReplace, dom.tabTTS];
-    const panels = [dom.panelReplace, dom.panelTTS];
+    const tabs = [dom.tabReplace, dom.tabTTS, dom.tabVoiceChanger];
+    const panels = [dom.panelReplace, dom.panelTTS, dom.panelVoiceChanger];
 
     function activateTab(idx) {
       tabs.forEach((t, i) => {
@@ -2191,6 +2368,8 @@ input[type="range"]::-moz-range-thumb {
         ).join('');
       s.value = cur;
     });
+    // Update Voice Changer dropdown
+    if (typeof populateVcVoices === 'function') populateVcVoices();
   }
 
   async function saveVoiceFromUpload() {
@@ -2498,6 +2677,8 @@ input[type="range"]::-moz-range-thumb {
   function handleModelChange() {
     const model = dom.ttsModelSelect ? dom.ttsModelSelect.value : 'qwen3-tts';
     const isMMS = model === 'mms-tts-ben';
+    const isIndicF5 = model === 'indicf5';
+    const supportsCloning = !isMMS; // both Qwen and IndicF5 support cloning
 
     // Voice cloning section: hide for MMS (no cloning support)
     if (dom.ttsVoiceGroup) {
@@ -2508,21 +2689,37 @@ input[type="range"]::-moz-range-thumb {
       }
     }
 
-    // Language selector: MMS only supports Bengali, auto-set it
+    // Ref text field: show only for IndicF5
+    if (dom.ttsRefTextGroup) {
+      if (isIndicF5) {
+        dom.ttsRefTextGroup.classList.remove('hidden');
+      } else {
+        dom.ttsRefTextGroup.classList.add('hidden');
+      }
+    }
+
+    // Language selector
     if (dom.ttsLanguage) {
       if (isMMS) {
         dom.ttsLanguage.value = 'Bengali';
         dom.ttsLanguage.disabled = true;
       } else {
+        if (isMMS || dom.ttsLanguage.value === 'Bengali' && !isIndicF5) {
+          // Don't auto-switch away from Bengali if IndicF5 is selected
+        }
         dom.ttsLanguage.disabled = false;
       }
     }
 
     // Update hint text
     if (dom.ttsModelHint) {
-      dom.ttsModelHint.textContent = isMMS
-        ? 'Bengali only. Voice cloning not supported.'
-        : 'Supports English, Bengali, Chinese, Japanese, Korean + voice cloning.';
+      if (isMMS) {
+        dom.ttsModelHint.textContent = 'Bengali only. No reference voice needed.';
+      } else if (isIndicF5) {
+        dom.ttsModelHint.textContent = 'Voice cloning for 11 Indian languages. Requires reference voice + transcript.';
+      } else {
+        dom.ttsModelHint.textContent = 'Requires a reference voice. Supports 10 languages including English, Chinese, Japanese, Korean, and more.';
+      }
     }
 
     // Clear voice ref if switching to MMS
@@ -2562,6 +2759,11 @@ input[type="range"]::-moz-range-thumb {
       } else if (state.ttsRefFile) {
         formData.append('reference_audio', state.ttsRefFile);
       }
+    }
+    // Include ref_text if provided (used by IndicF5)
+    const refText = dom.ttsRefText ? dom.ttsRefText.value.trim() : '';
+    if (refText) {
+      formData.append('ref_text', refText);
     }
 
     try {
@@ -2648,6 +2850,7 @@ input[type="range"]::-moz-range-thumb {
     if (dom.ttsSaveVoiceBtn) dom.ttsSaveVoiceBtn.classList.add('hidden');
     if (dom.ttsModelSelect) dom.ttsModelSelect.value = 'qwen3-tts';
     if (dom.ttsLanguage) { dom.ttsLanguage.value = 'auto'; dom.ttsLanguage.disabled = false; }
+    if (dom.ttsRefText) dom.ttsRefText.value = '';
     handleModelChange();
     dom.ttsSpeed.value = '1.0';
     dom.ttsSpeedVal.textContent = '1.0x';
@@ -2779,6 +2982,311 @@ input[type="range"]::-moz-range-thumb {
     }
   }
 
+  /* -----------------------------------------------
+     Voice Changer — real-time mic → TTS via WebSocket
+     ----------------------------------------------- */
+
+  // Voice-changer runtime state (kept separate from main state)
+  const vc = {
+    ws: null,
+    mediaStream: null,
+    recorder: null,
+    audioCtx: null,
+    analyser: null,
+    animFrame: null,
+    nextPlayTime: 0,
+    running: false,
+  };
+
+  function initVoiceChanger() {
+    // Populate voice dropdown from cached voices
+    populateVcVoices();
+
+    // Model change: show/hide ref-text field
+    dom.vcModelSelect.addEventListener('change', handleVcModelChange);
+    handleVcModelChange();
+
+    // Start / Stop toggle
+    dom.vcStartBtn.addEventListener('click', () => {
+      if (vc.running) {
+        stopVoiceChanger();
+      } else {
+        startVoiceChanger();
+      }
+    });
+  }
+
+  function populateVcVoices() {
+    const sel = dom.vcVoiceSelect;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Select a saved voice...</option>' +
+      state.voices.map(v =>
+        `<option value="${v.voice_id}">${escapeHtml(v.name)} (${v.duration ? v.duration.toFixed(1) + 's' : '?'})</option>`
+      ).join('');
+    sel.value = cur;
+  }
+
+  function handleVcModelChange() {
+    const model = dom.vcModelSelect.value;
+    if (model === 'indicf5') {
+      dom.vcRefTextGroup.classList.remove('hidden');
+    } else {
+      dom.vcRefTextGroup.classList.add('hidden');
+    }
+  }
+
+  function setVcStatus(status, text) {
+    // status: ready | listening | processing | error
+    dom.vcStatusDot.className = 'vc-dot ' + status;
+    dom.vcStatus.textContent = text;
+  }
+
+  async function startVoiceChanger() {
+    const voiceId = dom.vcVoiceSelect.value;
+    const model = dom.vcModelSelect.value;
+
+    if (!voiceId) {
+      showToast('error', 'No voice selected', 'Please select a reference voice first.');
+      return;
+    }
+
+    if (model === 'indicf5' && !dom.vcRefText.value.trim()) {
+      showToast('error', 'Reference text required', 'IndicF5 needs a transcript of the reference audio.');
+      return;
+    }
+
+    // Request microphone
+    try {
+      vc.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      showToast('error', 'Microphone denied', 'Please allow microphone access to use voice changer.');
+      return;
+    }
+
+    // Set up Web Audio analyser for waveform
+    vc.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = vc.audioCtx.createMediaStreamSource(vc.mediaStream);
+    vc.analyser = vc.audioCtx.createAnalyser();
+    vc.analyser.fftSize = 2048;
+    source.connect(vc.analyser);
+    drawWaveform();
+
+    // Open WebSocket
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = `${proto}://${location.host}/ws/voice-changer`;
+    vc.ws = new WebSocket(wsUrl);
+    vc.ws.binaryType = 'arraybuffer';
+
+    vc.ws.onopen = () => {
+      // Send config message
+      const config = {
+        voice_id: voiceId,
+        tts_model: model,
+        language: 'auto',
+      };
+      if (model === 'indicf5') {
+        config.ref_text = dom.vcRefText.value.trim();
+      }
+      vc.ws.send(JSON.stringify(config));
+    };
+
+    vc.ws.onmessage = handleVcMessage;
+
+    vc.ws.onerror = () => {
+      setVcStatus('error', 'Connection error');
+      stopVoiceChanger();
+    };
+
+    vc.ws.onclose = () => {
+      if (vc.running) {
+        setVcStatus('ready', 'Disconnected');
+        stopVoiceChanger();
+      }
+    };
+
+    // Update UI to recording state
+    vc.running = true;
+    vc.nextPlayTime = 0;
+    dom.vcStartBtn.textContent = 'Stop Voice Changer';
+    dom.vcStartBtn.classList.add('btn-recording');
+    dom.vcTranscript.innerHTML = '';
+    dom.vcVoiceSelect.disabled = true;
+    dom.vcModelSelect.disabled = true;
+    dom.vcRefText.disabled = true;
+    setVcStatus('listening', 'Connecting...');
+  }
+
+  function handleVcMessage(evt) {
+    if (typeof evt.data === 'string') {
+      // JSON status message
+      try {
+        const msg = JSON.parse(evt.data);
+        if (msg.status === 'ready') {
+          setVcStatus('listening', 'Listening... speak now');
+          startRecording();
+        } else if (msg.status === 'transcribing') {
+          setVcStatus('processing', 'Transcribing...');
+        } else if (msg.status === 'synthesizing') {
+          setVcStatus('processing', 'Synthesizing: ' + (msg.text || ''));
+          // Show transcript
+          if (msg.text) {
+            const p = document.createElement('p');
+            p.textContent = msg.text;
+            dom.vcTranscript.appendChild(p);
+            dom.vcTranscript.scrollTop = dom.vcTranscript.scrollHeight;
+          }
+        } else if (msg.status === 'chunk_done') {
+          setVcStatus('listening', 'Listening...');
+        } else if (msg.status === 'no_speech') {
+          setVcStatus('listening', 'Listening... (no speech detected)');
+        } else if (msg.status === 'error') {
+          setVcStatus('error', 'Error: ' + (msg.message || 'unknown'));
+        } else if (msg.error) {
+          setVcStatus('error', 'Error: ' + msg.error);
+        }
+      } catch { /* ignore malformed JSON */ }
+    } else {
+      // Binary WAV data — play it back
+      playAudioChunk(evt.data);
+    }
+  }
+
+  function startRecording() {
+    if (!vc.mediaStream || !vc.ws) return;
+
+    // Prefer webm/opus; fall back to whatever the browser supports
+    let mimeType = 'audio/webm;codecs=opus';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = 'audio/webm';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = ''; // let browser decide
+      }
+    }
+
+    const options = mimeType ? { mimeType } : {};
+    vc.recorder = new MediaRecorder(vc.mediaStream, options);
+
+    vc.recorder.ondataavailable = (e) => {
+      if (e.data.size > 0 && vc.ws && vc.ws.readyState === WebSocket.OPEN) {
+        vc.ws.send(e.data);
+      }
+    };
+
+    vc.recorder.start(3000); // 3-second chunks
+  }
+
+  function stopVoiceChanger() {
+    vc.running = false;
+
+    // Stop recorder
+    if (vc.recorder && vc.recorder.state !== 'inactive') {
+      vc.recorder.stop();
+    }
+    vc.recorder = null;
+
+    // Release microphone
+    if (vc.mediaStream) {
+      vc.mediaStream.getTracks().forEach(t => t.stop());
+      vc.mediaStream = null;
+    }
+
+    // Stop waveform drawing
+    if (vc.animFrame) {
+      cancelAnimationFrame(vc.animFrame);
+      vc.animFrame = null;
+    }
+
+    // Clear waveform canvas
+    const canvas = dom.vcWaveform;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Close AudioContext
+    if (vc.audioCtx) {
+      vc.audioCtx.close().catch(() => {});
+      vc.audioCtx = null;
+      vc.analyser = null;
+    }
+
+    // Close WebSocket
+    if (vc.ws) {
+      try {
+        if (vc.ws.readyState === WebSocket.OPEN) {
+          vc.ws.send(JSON.stringify({ action: 'stop' }));
+        }
+        vc.ws.close();
+      } catch { /* ignore */ }
+      vc.ws = null;
+    }
+
+    // Reset UI
+    dom.vcStartBtn.textContent = 'Start Voice Changer';
+    dom.vcStartBtn.classList.remove('btn-recording');
+    dom.vcVoiceSelect.disabled = false;
+    dom.vcModelSelect.disabled = false;
+    dom.vcRefText.disabled = false;
+    setVcStatus('ready', 'Ready');
+  }
+
+  function playAudioChunk(arrayBuffer) {
+    if (!vc.audioCtx || vc.audioCtx.state === 'closed') {
+      // Create a new context just for playback if needed
+      vc.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const ctx = vc.audioCtx;
+
+    ctx.decodeAudioData(arrayBuffer.slice(0), (audioBuffer) => {
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+
+      // Schedule for gapless playback
+      const now = ctx.currentTime;
+      if (vc.nextPlayTime < now) {
+        vc.nextPlayTime = now;
+      }
+      source.start(vc.nextPlayTime);
+      vc.nextPlayTime += audioBuffer.duration;
+    }, (err) => {
+      console.warn('Voice changer: failed to decode audio chunk', err);
+    });
+  }
+
+  function drawWaveform() {
+    if (!vc.analyser) return;
+
+    const canvas = dom.vcWaveform;
+    const ctx = canvas.getContext('2d');
+    const bufLen = vc.analyser.frequencyBinCount;
+    const data = new Uint8Array(bufLen);
+
+    function draw() {
+      if (!vc.running) return;
+      vc.animFrame = requestAnimationFrame(draw);
+      vc.analyser.getByteTimeDomainData(data);
+
+      const styles = getComputedStyle(document.documentElement);
+      ctx.fillStyle = styles.getPropertyValue('--bg-secondary').trim() || '#1a1a2e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = styles.getPropertyValue('--primary').trim() || '#6c63ff';
+      ctx.beginPath();
+
+      const sliceWidth = canvas.width / bufLen;
+      let x = 0;
+      for (let i = 0; i < bufLen; i++) {
+        const v = data[i] / 128.0;
+        const y = (v * canvas.height) / 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        x += sliceWidth;
+      }
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+    }
+    draw();
+  }
+
   function initSidebar() {
     dom.sidebarToggle.addEventListener('click', () => {
       const collapsed = dom.sidebar.classList.toggle('collapsed');
@@ -2794,6 +3302,7 @@ input[type="range"]::-moz-range-thumb {
     initTabs();
     initUpload();
     initTTS();
+    initVoiceChanger();
     initSidebar();
 
     dom.startReplacementBtn.addEventListener('click', handleStartReplacement);

@@ -12,6 +12,8 @@ Torch Hub cache layouts.  After downloading, set ``MODELS_DIR``
 in your ``.env`` and the app will use local models only.
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import sys

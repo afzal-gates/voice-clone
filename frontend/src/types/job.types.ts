@@ -1,0 +1,99 @@
+export const JobStatus = {
+  PENDING: 'pending',
+  EXTRACTING_AUDIO: 'extracting_audio',
+  SEPARATING: 'separating',
+  DIARIZING: 'diarizing',
+  TRANSCRIBING: 'transcribing',
+  AWAITING_VOICE_ASSIGNMENT: 'awaiting_voice_assignment',
+  GENERATING_SPEECH: 'generating_speech',
+  ALIGNING: 'aligning',
+  MERGING: 'merging',
+  COMPLETED: 'completed',
+  FAILED: 'failed'
+} as const;
+
+export type JobStatus = typeof JobStatus[keyof typeof JobStatus];
+
+export const InputType = {
+  AUDIO: 'audio',
+  VIDEO: 'video'
+} as const;
+
+export type InputType = typeof InputType[keyof typeof InputType];
+
+export interface Speaker {
+  speaker_id: string;
+  label: string;
+  segment_count: number;
+  total_duration: number;
+  assigned_voice_ref?: string;
+}
+
+export interface JobDetailResponse {
+  job_id: string;
+  status: JobStatus;
+  input_type: InputType;
+  input_filename: string;
+  speakers: Speaker[];
+  progress: number;
+  error?: string;
+  created_at: string;
+  output_file?: string;
+}
+
+export interface JobResponse {
+  job_id: string;
+  status: JobStatus;
+  message: string;
+}
+
+export interface VoiceAssignment {
+  speaker_id: string;
+  voice_ref: string;
+}
+
+export interface UploadProgress {
+  loaded: number;
+  total: number;
+  percentage: number;
+}
+
+export interface DownloadOptions {
+  format: 'wav' | 'mp3' | 'mp4';
+}
+
+export interface Voice {
+  id: string;
+  name: string;
+  language: string;
+  gender?: string;
+  reference_audio?: string;
+}
+
+export const JobStatusLabels: Record<JobStatus, string> = {
+  [JobStatus.PENDING]: 'Pending',
+  [JobStatus.EXTRACTING_AUDIO]: 'Extracting Audio',
+  [JobStatus.SEPARATING]: 'Separating Sources',
+  [JobStatus.DIARIZING]: 'Identifying Speakers',
+  [JobStatus.TRANSCRIBING]: 'Transcribing',
+  [JobStatus.AWAITING_VOICE_ASSIGNMENT]: 'Awaiting Voice Assignment',
+  [JobStatus.GENERATING_SPEECH]: 'Generating Speech',
+  [JobStatus.ALIGNING]: 'Aligning Audio',
+  [JobStatus.MERGING]: 'Merging Audio',
+  [JobStatus.COMPLETED]: 'Completed',
+  [JobStatus.FAILED]: 'Failed'
+};
+
+export const JobStatusColors: Record<JobStatus, 'info' | 'success' | 'error' | 'warning'> = {
+  [JobStatus.PENDING]: 'info',
+  [JobStatus.EXTRACTING_AUDIO]: 'info',
+  [JobStatus.SEPARATING]: 'info',
+  [JobStatus.DIARIZING]: 'info',
+  [JobStatus.TRANSCRIBING]: 'info',
+  [JobStatus.AWAITING_VOICE_ASSIGNMENT]: 'warning',
+  [JobStatus.GENERATING_SPEECH]: 'info',
+  [JobStatus.ALIGNING]: 'info',
+  [JobStatus.MERGING]: 'info',
+  [JobStatus.COMPLETED]: 'success',
+  [JobStatus.FAILED]: 'error'
+};

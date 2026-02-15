@@ -14,9 +14,12 @@ from app.config import settings
 from app.models import JobStatus, VoiceAssignment
 from app.pipeline.aligner import AudioAligner
 from app.pipeline.audio_extractor import AudioExtractor
+from app.pipeline.audio_mixer import AudioMixer
 from app.pipeline.diarizer import SpeakerDiarizer
 from app.pipeline.merger import AudioMerger
+from app.pipeline.music_engine import MusicEngine
 from app.pipeline.separator import AudioSeparator
+from app.pipeline.singing_engine import SingingEngine
 from app.pipeline.transcriber import SpeechTranscriber
 from app.pipeline.tts_engine import TTSEngine
 from app.services.job_manager import JobManager
@@ -42,6 +45,9 @@ class PipelineOrchestrator:
         self.diarizer = SpeakerDiarizer()
         self.transcriber = SpeechTranscriber()
         self.tts_engine = TTSEngine()
+        self.music_engine = MusicEngine()
+        self.singing_engine = SingingEngine()
+        self.audio_mixer = AudioMixer()
         self.aligner = AudioAligner()
         self.merger = AudioMerger()
 
@@ -407,6 +413,310 @@ class PipelineOrchestrator:
 
         except Exception as exc:
             logger.exception("Job %s: TTS processing failed", job_id)
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.FAILED,
+                error=str(exc),
+            )
+            raise
+
+    # ------------------------------------------------------------------
+    # Music generation pipeline
+    # ------------------------------------------------------------------
+
+    async def process_music(
+        self,
+        job_id: str,
+        prompt: str,
+        duration: float = 10.0,
+        style: str | None = None,
+        ref_audio_path: Path | None = None,
+    ) -> Path:
+        """Generate music from a text prompt.
+
+        Args:
+            job_id:          The job identifier.
+            prompt:          Text description of the desired music.
+            duration:        Length of audio to generate in seconds (5-30s).
+            style:           Optional genre/style preset for enhanced generation.
+            ref_audio_path:  Optional reference audio for melody conditioning.
+
+        Returns:
+            Path to the generated music file.
+
+        Raises:
+            Exception: Re-raised after marking the job as ``FAILED``.
+        """
+        try:
+            job_dir = self.job_manager.get_job_dir(job_id)
+            output_dir = job_dir / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            output_path = output_dir / "music_output.wav"
+
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.GENERATING_SPEECH,
+                progress=0.30,
+            )
+
+            logger.info(
+                "Job %s: generating music (prompt='%s...', duration=%.1fs, style=%s)",
+                job_id,
+                prompt[:30],
+                duration,
+                style or "none",
+            )
+
+            await self.music_engine.generate(
+                prompt=prompt,
+                output_path=output_path,
+                duration=duration,
+                style=style,
+                ref_audio_path=ref_audio_path,
+            )
+
+            # Export to MP3 as well
+            await self.merger.export_formats(output_path, output_dir)
+
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.COMPLETED,
+                progress=1.0,
+                output_file=str(output_path),
+            )
+
+            logger.info("Job %s: Music generation complete -> %s", job_id, output_path)
+            return output_path
+
+        except Exception as exc:
+            logger.exception("Job %s: Music generation failed", job_id)
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.FAILED,
+                error=str(exc),
+            )
+            raise
+
+    # ------------------------------------------------------------------
+    # Singing synthesis pipeline
+    # ------------------------------------------------------------------
+
+    async def process_singing(
+        self,
+        job_id: str,
+        lyrics: str,
+        melody: str | None,
+        voice_model: str,
+        tempo: int,
+        key_shift: int,
+        melody_file_path: Path | None = None,
+    ) -> Path:
+        """Generate singing from lyrics and melody.
+
+        Args:
+            job_id:           The job identifier.
+            lyrics:           Song lyrics to synthesize.
+            melody:           Melody in ABC notation or "auto" for auto-generation.
+                              ``None`` if melody_file_path is provided.
+            voice_model:      Singing voice model identifier.
+            tempo:            Tempo in BPM (60-240).
+            key_shift:        Semitone shift (-12 to +12).
+            melody_file_path: Optional MIDI file for melody input.
+
+        Returns:
+            Path to the generated singing audio file.
+
+        Raises:
+            Exception: Re-raised after marking the job as ``FAILED``.
+        """
+        try:
+            job_dir = self.job_manager.get_job_dir(job_id)
+            output_dir = job_dir / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / "singing_output.wav"
+
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.GENERATING_SPEECH,
+                progress=0.30,
+            )
+
+            # Determine melody source
+            melody_input: str | Path | None = None
+            if melody_file_path is not None:
+                melody_input = melody_file_path
+                logger.info("Job %s: using MIDI melody file: %s", job_id, melody_file_path.name)
+            elif melody is not None and melody.lower() == "auto":
+                melody_input = None  # Auto-generate
+                logger.info("Job %s: auto-generating melody", job_id)
+            elif melody is not None:
+                melody_input = melody  # ABC notation
+                logger.info("Job %s: using ABC notation melody", job_id)
+            else:
+                melody_input = None  # Auto-generate as fallback
+                logger.info("Job %s: no melody provided, auto-generating", job_id)
+
+            logger.info(
+                "Job %s: synthesizing singing (voice=%s, tempo=%d, key_shift=%d, lyrics_len=%d)",
+                job_id,
+                voice_model,
+                tempo,
+                key_shift,
+                len(lyrics),
+            )
+
+            # Synthesize singing
+            await self.singing_engine.synthesize(
+                lyrics=lyrics,
+                melody=melody_input,
+                voice_model=voice_model,
+                tempo=tempo,
+                key_shift=key_shift,
+                output_path=output_path,
+            )
+
+            self.job_manager.update_job(
+                job_id,
+                progress=0.85,
+            )
+
+            # Export to additional formats (MP3)
+            logger.info("Job %s: exporting additional formats", job_id)
+            await self.merger.export_formats(output_path, output_dir)
+
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.COMPLETED,
+                progress=1.0,
+                output_file=str(output_path),
+            )
+
+            logger.info("Job %s: singing synthesis complete -> %s", job_id, output_path)
+            return output_path
+
+        except Exception as exc:
+            logger.exception("Job %s: singing synthesis failed", job_id)
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.FAILED,
+                error=str(exc),
+            )
+            raise
+
+    # ------------------------------------------------------------------
+    # Audio mixing pipeline
+    # ------------------------------------------------------------------
+
+    async def process_mix(
+        self,
+        job_id: str,
+        tts_job_id: str,
+        music_job_id: str,
+        tts_volume: float = 0.85,
+        music_volume: float = 0.30,
+        music_delay: float = 0.0,
+    ) -> Path:
+        """Mix TTS narration with background music.
+
+        Loads completed TTS and music outputs from their respective jobs,
+        mixes them with adjustable volume levels and timing, and exports
+        the result.
+
+        Args:
+            job_id:       The new mixing job identifier.
+            tts_job_id:   Job ID of completed TTS generation.
+            music_job_id: Job ID of completed music generation.
+            tts_volume:   TTS volume level (0.0-1.0). Default: 0.85.
+            music_volume: Music volume level (0.0-1.0). Default: 0.30.
+            music_delay:  Delay before music starts in seconds. Default: 0.0.
+
+        Returns:
+            Path to the mixed audio file.
+
+        Raises:
+            Exception: Re-raised after marking the job as ``FAILED``.
+        """
+        try:
+            # Validate source jobs exist and are completed
+            tts_job = self.job_manager.get_job(tts_job_id)
+            if tts_job is None:
+                raise ValueError(f"TTS job not found: {tts_job_id}")
+            if tts_job.status != JobStatus.COMPLETED:
+                raise ValueError(
+                    f"TTS job not completed (status: {tts_job.status.value})"
+                )
+            if not tts_job.output_file or not Path(tts_job.output_file).exists():
+                raise ValueError(f"TTS output file not found for job: {tts_job_id}")
+
+            music_job = self.job_manager.get_job(music_job_id)
+            if music_job is None:
+                raise ValueError(f"Music job not found: {music_job_id}")
+            if music_job.status != JobStatus.COMPLETED:
+                raise ValueError(
+                    f"Music job not completed (status: {music_job.status.value})"
+                )
+            if not music_job.output_file or not Path(music_job.output_file).exists():
+                raise ValueError(
+                    f"Music output file not found for job: {music_job_id}"
+                )
+
+            # Setup output paths
+            job_dir = self.job_manager.get_job_dir(job_id)
+            output_dir = job_dir / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / "mixed_output.wav"
+
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.MERGING,
+                progress=0.20,
+            )
+
+            logger.info(
+                "Job %s: mixing audio (tts=%s, music=%s, tts_vol=%.2f, music_vol=%.2f, delay=%.2fs)",
+                job_id,
+                tts_job_id,
+                music_job_id,
+                tts_volume,
+                music_volume,
+                music_delay,
+            )
+
+            # Perform the mix
+            tts_path = Path(tts_job.output_file)
+            music_path = Path(music_job.output_file)
+
+            await self.audio_mixer.mix(
+                tts_audio_path=tts_path,
+                music_audio_path=music_path,
+                output_path=output_path,
+                tts_volume=tts_volume,
+                music_volume=music_volume,
+                music_delay=music_delay,
+            )
+
+            self.job_manager.update_job(
+                job_id,
+                progress=0.70,
+            )
+
+            # Export additional formats (MP3)
+            logger.info("Job %s: exporting additional formats", job_id)
+            await self.merger.export_formats(output_path, output_dir)
+
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.COMPLETED,
+                progress=1.0,
+                output_file=str(output_path),
+            )
+
+            logger.info("Job %s: audio mixing complete -> %s", job_id, output_path)
+            return output_path
+
+        except Exception as exc:
+            logger.exception("Job %s: audio mixing failed", job_id)
             self.job_manager.update_job(
                 job_id,
                 status=JobStatus.FAILED,

@@ -50,27 +50,57 @@ class SpeakerDiarizer:
 
         try:
             from pyannote.audio import Pipeline  # type: ignore[import-untyped]
+            import torch  # type: ignore[import-untyped]
+
+            # PyTorch 2.6 compatibility: allow required classes in model loading
+            # Import pyannote classes that may be in the checkpoint
+            try:
+                from pyannote.audio.core.task import Specifications  # type: ignore[import-untyped]
+                from pyannote.audio.core.model import Model  # type: ignore[import-untyped]
+                from pyannote.core import Segment, Timeline, Annotation  # type: ignore[import-untyped]
+
+                safe_globals = [
+                    torch.torch_version.TorchVersion,
+                    Specifications,
+                    Model,
+                    Segment,
+                    Timeline,
+                    Annotation,
+                ]
+                torch.serialization.add_safe_globals(safe_globals)
+            except ImportError as e:
+                # If specific classes can't be imported, log and continue
+                # The pipeline loading will use weights_only=False as fallback
+                logger.warning("Could not import all pyannote classes for safe loading: %s", e)
 
             logger.info(
                 "Loading pyannote diarization pipeline: %s",
                 settings.PYANNOTE_MODEL,
             )
 
+            # Load pipeline with weights_only=False for PyTorch 2.6 compatibility
+            # The pyannote models from Hugging Face are trusted sources
             hf_token = settings.HF_TOKEN or None
-            self._pipeline = Pipeline.from_pretrained(
-                settings.PYANNOTE_MODEL,
-                use_auth_token=hf_token,
-            )
+
+            # Temporarily override torch.load to use weights_only=False
+            original_load = torch.load
+            def patched_load(*args, **kwargs):
+                kwargs.setdefault('weights_only', False)
+                return original_load(*args, **kwargs)
+
+            torch.load = patched_load
+            try:
+                self._pipeline = Pipeline.from_pretrained(
+                    settings.PYANNOTE_MODEL,
+                    use_auth_token=hf_token,
+                )
+            finally:
+                torch.load = original_load
 
             # Move to GPU when available
-            try:
-                import torch  # type: ignore[import-untyped]
-
-                if torch.cuda.is_available():
-                    self._pipeline = self._pipeline.to(torch.device("cuda"))
-                    logger.info("Diarization pipeline moved to CUDA")
-            except ImportError:
-                pass
+            if torch.cuda.is_available():
+                self._pipeline = self._pipeline.to(torch.device("cuda"))
+                logger.info("Diarization pipeline moved to CUDA")
 
             logger.info("Diarization pipeline loaded successfully")
 

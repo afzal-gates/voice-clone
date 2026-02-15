@@ -1,0 +1,171 @@
+/**
+ * Global Styles and CSS Variables
+ */
+
+:root {
+  /* Colors - Dark Theme */
+  --primary: #646cff;
+  --primary-hover: #535bf2;
+  --primary-bg: rgba(100, 108, 255, 0.1);
+
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.1);
+
+  --error: #ef4444;
+  --error-bg: rgba(239, 68, 68, 0.1);
+
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+
+  --info: #3b82f6;
+  --info-bg: rgba(59, 130, 246, 0.1);
+
+  --background: #1a1a1a;
+  --background-secondary: #2a2a2a;
+
+  --text: rgba(255, 255, 255, 0.87);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-tertiary: rgba(255, 255, 255, 0.38);
+
+  --border: rgba(255, 255, 255, 0.12);
+
+  /* Typography */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Rendering */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  color-scheme: dark;
+  color: var(--text);
+  background-color: var(--background);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Colors - Light Theme */
+    --primary: #646cff;
+    --primary-hover: #535bf2;
+    --primary-bg: rgba(100, 108, 255, 0.1);
+
+    --success: #16a34a;
+    --success-bg: rgba(22, 163, 74, 0.1);
+
+    --error: #dc2626;
+    --error-bg: rgba(220, 38, 38, 0.1);
+
+    --warning: #d97706;
+    --warning-bg: rgba(217, 119, 6, 0.1);
+
+    --info: #2563eb;
+    --info-bg: rgba(37, 99, 235, 0.1);
+
+    --background: #ffffff;
+    --background-secondary: #f5f5f5;
+
+    --text: #213547;
+    --text-secondary: rgba(33, 53, 71, 0.7);
+    --text-tertiary: rgba(33, 53, 71, 0.5);
+
+    --border: rgba(0, 0, 0, 0.12);
+
+    color-scheme: light;
+    color: var(--text);
+    background-color: var(--background);
+  }
+}
+
+/* Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Body */
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--background);
+  color: var(--text);
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+h1 { font-size: 2.5rem; }
+h2 { font-size: 2rem; }
+h3 { font-size: 1.5rem; }
+h4 { font-size: 1.25rem; }
+h5 { font-size: 1rem; }
+h6 { font-size: 0.875rem; }
+
+p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Links */
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--primary-bg);
+  color: var(--primary);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}

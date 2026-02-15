@@ -1,0 +1,128 @@
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 320px;
+  max-width: 480px;
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+
+.toast-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.toast-close:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.toast-close:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+/* Success variant */
+.toast-success {
+  border-left-color: var(--success);
+}
+
+.toast-success .toast-icon {
+  background: var(--success-subtle);
+  color: var(--success);
+}
+
+/* Error variant */
+.toast-error {
+  border-left-color: var(--error);
+}
+
+.toast-error .toast-icon {
+  background: var(--error-subtle);
+  color: var(--error);
+}
+
+/* Warning variant */
+.toast-warning {
+  border-left-color: var(--warning);
+}
+
+.toast-warning .toast-icon {
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+/* Info variant */
+.toast-info {
+  border-left-color: var(--accent);
+}
+
+.toast-info .toast-icon {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    min-width: auto;
+  }
+}

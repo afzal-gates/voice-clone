@@ -41,6 +41,21 @@ class InputType(str, Enum):
     TEXT = "text"
 
 
+class MusicStyle(str, Enum):
+    """Music generation styles/genres."""
+
+    POP = "pop"
+    ROCK = "rock"
+    ELECTRONIC = "electronic"
+    CLASSICAL = "classical"
+    JAZZ = "jazz"
+    AMBIENT = "ambient"
+    HIP_HOP = "hip-hop"
+    COUNTRY = "country"
+    FOLK = "folk"
+    CINEMATIC = "cinematic"
+
+
 # ---------------------------------------------------------------------------
 # Domain models
 # ---------------------------------------------------------------------------
@@ -164,6 +179,68 @@ class VoiceAssignmentRequest(BaseModel):
     assignments: list[VoiceAssignment]
 
 
+class MusicRequest(BaseModel):
+    """Request payload for music generation.
+
+    Attributes:
+        prompt: Text description of the desired music.
+        duration: Length of generated audio in seconds (5-30s).
+        style: Optional genre/style preset for enhanced generation.
+    """
+
+    prompt: str = Field(..., min_length=1, max_length=500)
+    duration: float = Field(default=10.0, ge=5.0, le=30.0)
+    style: Optional[MusicStyle] = None
+
+
+class MusicResponse(BaseModel):
+    """Response returned after music generation request.
+
+    Attributes:
+        job_id: The unique job identifier.
+        status: Current generation status.
+        output_file: Path to the generated audio file, else ``None``.
+        duration: Actual duration of generated audio in seconds.
+    """
+
+    job_id: str
+    status: str
+    output_file: Optional[str] = None
+    duration: Optional[float] = None
+
+
+class MixRequest(BaseModel):
+    """Request payload for audio mixing.
+
+    Attributes:
+        tts_job_id: Job ID of the completed TTS generation.
+        music_job_id: Job ID of the completed music generation.
+        tts_volume: TTS volume level (0.0-1.0). Default: 0.85.
+        music_volume: Music volume level (0.0-1.0). Default: 0.30.
+        music_delay: Delay before music starts in seconds. Default: 0.0.
+    """
+
+    tts_job_id: str
+    music_job_id: str
+    tts_volume: float = Field(default=0.85, ge=0.0, le=1.0)
+    music_volume: float = Field(default=0.30, ge=0.0, le=1.0)
+    music_delay: float = Field(default=0.0, ge=0.0, le=30.0)
+
+
+class MixResponse(BaseModel):
+    """Response returned after audio mixing request.
+
+    Attributes:
+        job_id: The unique job identifier.
+        status: Current mixing status.
+        output_file: Path to the mixed audio file, else ``None``.
+    """
+
+    job_id: str
+    status: str
+    output_file: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Response models
 # ---------------------------------------------------------------------------
@@ -235,3 +312,49 @@ class VoiceProfileResponse(BaseModel):
     created_at: datetime
     sample_rate: int = 0
     duration: float = 0.0
+
+
+class MelodyFormat(str, Enum):
+    """Melody input formats for singing synthesis."""
+
+    MIDI = "midi"
+    NOTATION = "notation"
+    AUTO = "auto"
+
+
+class SingingRequest(BaseModel):
+    """Request payload for singing synthesis.
+
+    Attributes:
+        lyrics: Song lyrics (text).
+        melody: Melody specification (MIDI file ID, notation string, or None).
+        melody_format: Format of the melody input.
+        voice_model: Singing voice model identifier.
+        tempo: Tempo in BPM (60-200).
+        key_shift: Pitch shift in semitones (-12 to +12).
+        language: Language code for phoneme conversion.
+    """
+
+    lyrics: str = Field(..., min_length=1, max_length=2000)
+    melody: Optional[str] = None
+    melody_format: MelodyFormat = MelodyFormat.AUTO
+    voice_model: str = "default"
+    tempo: int = Field(default=120, ge=60, le=200)
+    key_shift: int = Field(default=0, ge=-12, le=12)
+    language: str = "en"
+
+
+class SingingResponse(BaseModel):
+    """Response returned after a singing synthesis request.
+
+    Attributes:
+        job_id: The unique job identifier.
+        status: Current synthesis status.
+        output_file: Path to the generated singing audio file, else ``None``.
+        duration: Actual duration of generated audio in seconds.
+    """
+
+    job_id: str
+    status: str
+    output_file: Optional[str] = None
+    duration: Optional[float] = None

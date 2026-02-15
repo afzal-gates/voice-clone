@@ -1,0 +1,50 @@
+/* ============================================================
+   CSS Custom Properties (Design System)
+   ============================================================ */
+:root {
+  /* Colors - Background */
+  --bg-primary: #0f172a;
+  --bg-card: #1e293b;
+  --bg-card-hover: #253349;
+  --bg-input: #0f172a;
+  --bg-surface: #162033;
+
+  /* Colors - Text */
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Colors - Accent */
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-subtle: rgba(99, 102, 241, 0.15);
+  --accent-glow: rgba(99, 102, 241, 0.3);
+
+  /* Colors - Status */
+  --success: #22c55e;
+  --success-subtle: rgba(34, 197, 94, 0.15);
+  --error: #ef4444;
+  --error-subtle: rgba(239, 68, 68, 0.15);
+  --warning: #f59e0b;
+  --warning-subtle: rgba(245, 158, 11, 0.15);
+
+  /* Colors - Borders */
+  --border: #334155;
+  --border-light: #475569;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows */
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  /* Transitions */
+  --transition: 0.2s ease;
+
+  /* Typography */
+  --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}

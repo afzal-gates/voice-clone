@@ -1,0 +1,86 @@
+.header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-logo {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 12px var(--accent-glow));
+}
+
+.header-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-settings-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.header-settings-button:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.header-settings-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.header-settings-button svg {
+  transition: transform var(--transition);
+}
+
+.header-settings-button:hover svg {
+  transform: rotate(30deg);
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .header-content {
+    padding: 0.875rem 1rem;
+  }
+
+  .header-title {
+    font-size: 1.25rem;
+  }
+
+  .header-logo {
+    width: 28px;
+    height: 28px;
+  }
+}

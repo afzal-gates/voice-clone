@@ -1,0 +1,147 @@
+import { create } from 'zustand';
+import type { JobDetailResponse } from '@/types/job.types';
+import { JobStatus } from '@/types/job.types';
+import { jobService } from '@/services/job.service';
+
+type TimeoutId = ReturnType<typeof setTimeout>;
+
+interface JobStore {
+  jobs: Map<string, JobDetailResponse>;
+  currentJobId: string | null;
+  pollingInterval: TimeoutId | null;
+  loading: boolean;
+  error: string | null;
+
+  setCurrentJob: (jobId: string | null) => void;
+  addJob: (job: JobDetailResponse) => void;
+  updateJob: (job: JobDetailResponse) => void;
+  removeJob: (jobId: string) => void;
+  clearJobs: () => void;
+
+  fetchJob: (jobId: string) => Promise<void>;
+  refreshJobs: () => Promise<void>;
+  deleteJob: (jobId: string) => Promise<void>;
+
+  startPolling: (jobId: string, interval?: number) => void;
+  stopPolling: () => void;
+}
+
+export const useJobStore = create<JobStore>((set, get) => ({
+  jobs: new Map(),
+  currentJobId: null,
+  pollingInterval: null,
+  loading: false,
+  error: null,
+
+  setCurrentJob: (jobId) => {
+    set({ currentJobId: jobId });
+  },
+
+  addJob: (job) => {
+    set((state) => {
+      const jobs = new Map(state.jobs);
+      jobs.set(job.job_id, job);
+      return { jobs };
+    });
+  },
+
+  updateJob: (job) => {
+    set((state) => {
+      const jobs = new Map(state.jobs);
+      jobs.set(job.job_id, job);
+      return { jobs };
+    });
+  },
+
+  removeJob: (jobId) => {
+    set((state) => {
+      const jobs = new Map(state.jobs);
+      jobs.delete(jobId);
+      return { jobs };
+    });
+  },
+
+  clearJobs: () => {
+    set({ jobs: new Map(), currentJobId: null });
+  },
+
+  fetchJob: async (jobId) => {
+    set({ loading: true, error: null });
+
+    try {
+      const job = await jobService.getJob(jobId);
+      get().updateJob(job);
+    } catch (err) {
+      const error = err instanceof Error ? err.message : 'Failed to fetch job';
+      set({ error });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  refreshJobs: async () => {
+    set({ loading: true, error: null });
+
+    try {
+      const jobs = await jobService.getAllJobs();
+      const jobsMap = new Map(jobs.map((job) => [job.job_id, job]));
+      set({ jobs: jobsMap });
+    } catch (err) {
+      const error = err instanceof Error ? err.message : 'Failed to refresh jobs';
+      set({ error });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  deleteJob: async (jobId) => {
+    set({ loading: true, error: null });
+
+    try {
+      await jobService.deleteJob(jobId);
+      get().removeJob(jobId);
+
+      if (get().currentJobId === jobId) {
+        set({ currentJobId: null });
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err.message : 'Failed to delete job';
+      set({ error });
+      throw err;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  startPolling: (jobId, interval = 2000) => {
+    const { stopPolling, fetchJob } = get();
+    stopPolling();
+
+    const poll = async () => {
+      await fetchJob(jobId);
+
+      const job = get().jobs.get(jobId);
+      if (
+        job &&
+        job.status !== JobStatus.COMPLETED &&
+        job.status !== JobStatus.FAILED &&
+        job.status !== JobStatus.AWAITING_VOICE_ASSIGNMENT
+      ) {
+        const timeoutId = setTimeout(poll, interval);
+        set({ pollingInterval: timeoutId });
+      } else {
+        set({ pollingInterval: null });
+      }
+    };
+
+    poll();
+  },
+
+  stopPolling: () => {
+    const { pollingInterval } = get();
+    if (pollingInterval !== null) {
+      clearTimeout(pollingInterval);
+      set({ pollingInterval: null });
+    }
+  }
+}));

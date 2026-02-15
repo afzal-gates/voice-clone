@@ -81,6 +81,12 @@ class Settings:
         self.MMS_TTS_MODEL: str = os.getenv("MMS_TTS_MODEL", "facebook/mms-tts-ben")
         self.INDICF5_MODEL: str = os.getenv("INDICF5_MODEL", "ai4bharat/IndicF5")
 
+        # --- Music Generation ---
+        self.MUSICGEN_MODEL: str = os.getenv("MUSICGEN_MODEL", "facebook/musicgen-small")
+        self.MUSICGEN_USE_GPU: bool = os.getenv("MUSICGEN_USE_GPU", "true").lower() in ("true", "1", "yes")
+        self.MUSICGEN_MAX_DURATION: float = float(os.getenv("MUSICGEN_MAX_DURATION", "30.0"))
+        self.MUSICGEN_MOCK_MODE: bool = os.getenv("MUSICGEN_MOCK_MODE", "true").lower() in ("true", "1", "yes")
+
         # --- Diarization ---
         self.PYANNOTE_MODEL: str = os.getenv(
             "PYANNOTE_MODEL", "pyannote/speaker-diarization-3.1"

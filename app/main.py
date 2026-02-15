@@ -29,6 +29,11 @@ from app.models import (
     JobDetailResponse,
     JobResponse,
     JobStatus,
+    MixRequest,
+    MixResponse,
+    MusicResponse,
+    MusicStyle,
+    SingingResponse,
     TTSResponse,
     VoiceAssignmentRequest,
     VoiceProfileResponse,
@@ -674,13 +679,396 @@ async def text_to_speech(
     )
 
 
+# -- Music Generation ------------------------------------------------------
+
+
+@app.post("/api/music", response_model=MusicResponse)
+async def generate_music(
+    prompt: str = Form(...),
+    duration: float = Form(default=10.0),
+    style: str | None = Form(default=None),
+    reference_audio: UploadFile | None = File(default=None),
+) -> MusicResponse:
+    """Generate music from a text prompt.
+
+    Uses Meta's AudioCraft MusicGen to create music based on textual
+    descriptions. Supports style conditioning via genre presets and
+    optional melody conditioning via reference audio uploads.
+
+    Args:
+        prompt:          Text description of the desired music (1-500 chars).
+        duration:        Length of audio to generate in seconds (5-30s).
+        style:           Optional genre/style preset (pop, rock, electronic, etc.).
+        reference_audio: Optional reference audio for melody conditioning.
+
+    Returns:
+        A :class:`MusicResponse` with the new ``job_id`` and status.
+
+    Raises:
+        HTTPException: 400 on invalid parameters (empty prompt, bad duration).
+    """
+    if not prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt must not be empty.")
+
+    if len(prompt) > 500:
+        raise HTTPException(
+            status_code=400, detail="Prompt must be 500 characters or less."
+        )
+
+    if not 5.0 <= duration <= 30.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Duration must be between 5 and 30 seconds.",
+        )
+
+    # Validate style if provided
+    if style is not None:
+        try:
+            MusicStyle(style.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid style '{style}'. Valid styles: {[s.value for s in MusicStyle]}",
+            )
+
+    # Create job
+    job = job_manager.create_job(InputType.TEXT, "music_generation")
+    job_dir = job_manager.get_job_dir(job.job_id)
+
+    # Handle reference audio upload
+    ref_path: Path | None = None
+    if reference_audio is not None and reference_audio.filename:
+        ref_path = job_dir / "references" / reference_audio.filename
+        await _save_upload(reference_audio, ref_path)
+        logger.info("Music gen using reference audio: %s", reference_audio.filename)
+
+    logger.info(
+        "Music generation request: job=%s prompt='%s...' duration=%.1fs style=%s ref=%s",
+        job.job_id,
+        prompt[:30],
+        duration,
+        style or "none",
+        ref_path.name if ref_path else "none",
+    )
+
+    # Launch background task
+    _launch_background_task(
+        orchestrator.process_music(
+            job_id=job.job_id,
+            prompt=prompt,
+            duration=duration,
+            style=style,
+            ref_audio_path=ref_path,
+        )
+    )
+
+    return MusicResponse(
+        job_id=job.job_id,
+        status=job.status.value,
+        output_file=None,
+        duration=duration,
+    )
+
+
+@app.get("/api/music/{job_id}", response_model=MusicResponse)
+async def get_music_status(job_id: str) -> MusicResponse:
+    """Get music generation job status.
+
+    Args:
+        job_id: The job identifier.
+
+    Returns:
+        A :class:`MusicResponse` with current status and output info.
+
+    Raises:
+        HTTPException: 404 if the job does not exist.
+    """
+    job = job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+
+    # Get actual duration if output exists
+    actual_duration: float | None = None
+    if job.output_file and Path(job.output_file).exists():
+        try:
+            import soundfile as sf
+
+            info = sf.info(job.output_file)
+            actual_duration = info.duration
+        except Exception:
+            pass
+
+    return MusicResponse(
+        job_id=job.job_id,
+        status=job.status.value,
+        output_file=job.output_file,
+        duration=actual_duration,
+    )
+
+
+# -- Audio Mixing ----------------------------------------------------------
+
+
+@app.post("/api/mix", response_model=MixResponse)
+async def mix_audio(request: MixRequest) -> MixResponse:
+    """Mix TTS narration with background music.
+
+    Combines completed TTS and music generation outputs with adjustable
+    volume levels and timing offsets. Both source jobs must be in
+    COMPLETED status with valid output files.
+
+    Args:
+        request: A :class:`MixRequest` with source job IDs and mix parameters.
+
+    Returns:
+        A :class:`MixResponse` with the new mixing job ID and status.
+
+    Raises:
+        HTTPException: 400 on validation failure (missing jobs, incomplete
+                       jobs, missing output files), 404 if source jobs not found.
+    """
+    # Validate source jobs exist
+    tts_job = job_manager.get_job(request.tts_job_id)
+    if tts_job is None:
+        raise HTTPException(
+            status_code=404, detail=f"TTS job not found: {request.tts_job_id}"
+        )
+
+    music_job = job_manager.get_job(request.music_job_id)
+    if music_job is None:
+        raise HTTPException(
+            status_code=404, detail=f"Music job not found: {request.music_job_id}"
+        )
+
+    # Validate jobs are completed
+    if tts_job.status != JobStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"TTS job is not completed. "
+                f"Current status: {tts_job.status.value}"
+            ),
+        )
+
+    if music_job.status != JobStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Music job is not completed. "
+                f"Current status: {music_job.status.value}"
+            ),
+        )
+
+    # Validate output files exist
+    if not tts_job.output_file or not Path(tts_job.output_file).exists():
+        raise HTTPException(
+            status_code=400,
+            detail=f"TTS output file not found for job: {request.tts_job_id}",
+        )
+
+    if not music_job.output_file or not Path(music_job.output_file).exists():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Music output file not found for job: {request.music_job_id}",
+        )
+
+    # Create mixing job
+    job = job_manager.create_job(InputType.TEXT, "audio_mix")
+
+    logger.info(
+        "Audio mixing request: job=%s, tts=%s, music=%s, tts_vol=%.2f, music_vol=%.2f, delay=%.2fs",
+        job.job_id,
+        request.tts_job_id,
+        request.music_job_id,
+        request.tts_volume,
+        request.music_volume,
+        request.music_delay,
+    )
+
+    # Launch background task
+    _launch_background_task(
+        orchestrator.process_mix(
+            job_id=job.job_id,
+            tts_job_id=request.tts_job_id,
+            music_job_id=request.music_job_id,
+            tts_volume=request.tts_volume,
+            music_volume=request.music_volume,
+            music_delay=request.music_delay,
+        )
+    )
+
+    return MixResponse(
+        job_id=job.job_id,
+        status=job.status.value,
+        output_file=None,
+    )
+
+
+@app.get("/api/mix/{job_id}", response_model=MixResponse)
+async def get_mix_status(job_id: str) -> MixResponse:
+    """Get audio mixing job status.
+
+    Args:
+        job_id: The mixing job identifier.
+
+    Returns:
+        A :class:`MixResponse` with current status and output info.
+
+    Raises:
+        HTTPException: 404 if the job does not exist.
+    """
+    job = job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+
+    return MixResponse(
+        job_id=job.job_id,
+        status=job.status.value,
+        output_file=job.output_file,
+    )
+
+
+# -- Singing Synthesis -----------------------------------------------------
+
+
+@app.post("/api/singing", response_model=SingingResponse)
+async def generate_singing(
+    lyrics: str = Form(...),
+    melody: str | None = Form(default=None),
+    melody_file: UploadFile | None = File(default=None),
+    voice_model: str = Form(default="default"),
+    tempo: int = Form(default=120),
+    key_shift: int = Form(default=0),
+) -> SingingResponse:
+    """Generate singing from lyrics and melody.
+
+    Supports three melody input methods:
+    1. ABC notation string via *melody* parameter
+    2. MIDI file upload via *melody_file* parameter
+    3. Auto-generation if neither is provided (or melody="auto")
+
+    Args:
+        lyrics:       Song lyrics to synthesize (1-2000 characters).
+        melody:       Melody in ABC notation or "auto" for auto-generation.
+        melody_file:  Optional MIDI file for melody input.
+        voice_model:  Singing voice model identifier (default: "default").
+        tempo:        Tempo in BPM (60-240, default: 120).
+        key_shift:    Semitone shift (-12 to +12, default: 0).
+
+    Returns:
+        A :class:`SingingResponse` with the new job_id and status.
+
+    Raises:
+        HTTPException: 400 on invalid parameters (empty lyrics, invalid tempo/key_shift).
+    """
+    # Validation
+    if not lyrics.strip():
+        raise HTTPException(status_code=400, detail="Lyrics are required.")
+
+    if len(lyrics) > 2000:
+        raise HTTPException(
+            status_code=400, detail="Lyrics too long (max 2000 characters)."
+        )
+
+    if not 60 <= tempo <= 240:
+        raise HTTPException(
+            status_code=400, detail="Tempo must be between 60 and 240 BPM."
+        )
+
+    if not -12 <= key_shift <= 12:
+        raise HTTPException(
+            status_code=400, detail="Key shift must be between -12 and +12 semitones."
+        )
+
+    # Create job
+    job = job_manager.create_job(InputType.TEXT, "singing_synthesis")
+    job_dir = job_manager.get_job_dir(job.job_id)
+
+    # Handle MIDI file upload
+    midi_path: Path | None = None
+    if melody_file is not None and melody_file.filename:
+        if not melody_file.filename.lower().endswith((".mid", ".midi")):
+            raise HTTPException(
+                status_code=400,
+                detail="Melody file must be a MIDI file (.mid or .midi).",
+            )
+        midi_path = job_dir / "references" / melody_file.filename
+        await _save_upload(melody_file, midi_path)
+        logger.info("MIDI file uploaded: %s", melody_file.filename)
+
+    logger.info(
+        "Singing generation request: job=%s voice=%s tempo=%d key_shift=%d lyrics_len=%d melody=%s",
+        job.job_id,
+        voice_model,
+        tempo,
+        key_shift,
+        len(lyrics),
+        "MIDI" if midi_path else (melody if melody else "auto"),
+    )
+
+    # Launch background task
+    _launch_background_task(
+        orchestrator.process_singing(
+            job_id=job.job_id,
+            lyrics=lyrics,
+            melody=melody,
+            voice_model=voice_model,
+            tempo=tempo,
+            key_shift=key_shift,
+            melody_file_path=midi_path,
+        )
+    )
+
+    return SingingResponse(
+        job_id=job.job_id,
+        status=job.status.value,
+        output_file=None,
+    )
+
+
+@app.get("/api/singing/{job_id}", response_model=SingingResponse)
+async def get_singing_status(job_id: str) -> SingingResponse:
+    """Get singing synthesis job status.
+
+    Args:
+        job_id: The job identifier.
+
+    Returns:
+        A :class:`SingingResponse` with current status and output info.
+
+    Raises:
+        HTTPException: 404 if the job does not exist.
+    """
+    job = job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+
+    return SingingResponse(
+        job_id=job.job_id,
+        status=job.status.value,
+        output_file=job.output_file,
+    )
+
+
+@app.get("/api/singing-models")
+async def list_singing_models() -> dict:
+    """List available singing voice models.
+
+    Returns:
+        Dictionary with "models" key containing list of available singing models.
+        Each model has: id, name, language, description.
+    """
+    models = orchestrator.singing_engine.list_available_models()
+    return {"models": models}
+
+
 # -- Download --------------------------------------------------------------
 
 
 @app.get("/api/jobs/{job_id}/download")
 async def download_output(
     job_id: str,
-    format: str = Query(default="wav", regex="^(wav|mp3|mp4)$"),  # noqa: A002
+    format: str = Query(default="wav", pattern="^(wav|mp3|mp4)$"),  # noqa: A002
 ) -> FileResponse:
     """Download the final output file for a completed job.
 
@@ -1032,3 +1420,217 @@ async def voice_changer_ws(websocket: WebSocket) -> None:
         logger.info("Voice changer WebSocket disconnected")
     except Exception as exc:
         logger.error("Voice changer WebSocket error: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Real-Time Voice Changer Control API
+# ---------------------------------------------------------------------------
+
+# Initialize real-time components
+from app.realtime import RealtimeAudioEngine, VoiceSelector  # noqa: E402
+
+rt_audio_engine = RealtimeAudioEngine()
+rt_voice_selector = VoiceSelector(voice_manager)
+
+
+@app.websocket("/ws/realtime-control")
+async def websocket_realtime_control(websocket: WebSocket) -> None:
+    """WebSocket endpoint for real-time voice changer control.
+
+    Handles commands for voice selection, audio start/stop, and status updates.
+    Similar to Voicemod's Control API.
+    """
+    await websocket.accept()
+    logger.info("Real-time control WebSocket connected")
+
+    try:
+        # Send initial status with presets
+        from app.realtime.voice_presets import list_presets
+
+        await websocket.send_json({
+            "type": "connected",
+            "status": rt_audio_engine.get_status(),
+            "voices": rt_voice_selector.get_voice_library(),
+            "presets": list_presets(),
+            "effectParameters": rt_audio_engine.get_effect_parameters(),
+        })
+
+        # Process commands
+        while True:
+            data = await websocket.receive_json()
+            action = data.get("action")
+
+            try:
+                if action == "getVoices":
+                    # Return voice library
+                    voices = rt_voice_selector.get_voice_library()
+                    await websocket.send_json({
+                        "type": "voices",
+                        "voices": voices,
+                    })
+
+                elif action == "selectVoice":
+                    # Switch to a different voice
+                    voice_id = data.get("voiceId")
+                    if not voice_id:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": "voiceId required",
+                        })
+                        continue
+
+                    voice_data = rt_voice_selector.select_voice(voice_id)
+                    rt_audio_engine.set_voice(
+                        voice_id,
+                        voice_data["audio_path"],
+                    )
+
+                    await websocket.send_json({
+                        "type": "voiceSelected",
+                        "voice": voice_data,
+                    })
+
+                elif action == "start":
+                    # Start real-time audio processing
+                    input_device = data.get("inputDevice")
+                    output_device = data.get("outputDevice")
+
+                    rt_audio_engine.start(
+                        input_device=input_device,
+                        output_device=output_device,
+                    )
+
+                    await websocket.send_json({
+                        "type": "started",
+                        "status": rt_audio_engine.get_status(),
+                    })
+
+                elif action == "stop":
+                    # Stop real-time audio processing
+                    rt_audio_engine.stop()
+
+                    await websocket.send_json({
+                        "type": "stopped",
+                        "status": rt_audio_engine.get_status(),
+                    })
+
+                elif action == "getStatus":
+                    # Get current engine status
+                    await websocket.send_json({
+                        "type": "status",
+                        "status": rt_audio_engine.get_status(),
+                    })
+
+                elif action == "getDevices":
+                    # List audio devices
+                    devices = rt_audio_engine.list_audio_devices()
+                    await websocket.send_json({
+                        "type": "devices",
+                        "devices": devices,
+                    })
+
+                elif action == "assignHotkey":
+                    # Assign hotkey to voice
+                    voice_id = data.get("voiceId")
+                    hotkey = data.get("hotkey")
+
+                    if voice_id and hotkey:
+                        rt_voice_selector.assign_hotkey(voice_id, hotkey)
+
+                        await websocket.send_json({
+                            "type": "hotkeyAssigned",
+                            "voiceId": voice_id,
+                            "hotkey": hotkey,
+                        })
+
+                elif action == "setEffectParameter":
+                    # Update a single effect parameter
+                    param_name = data.get("parameter")
+                    value = data.get("value")
+
+                    if param_name and value is not None:
+                        rt_audio_engine.update_effect_parameter(param_name, value)
+
+                        await websocket.send_json({
+                            "type": "effectParameterUpdated",
+                            "parameter": param_name,
+                            "value": value,
+                        })
+
+                elif action == "getEffectParameters":
+                    # Get current effect parameters
+                    params = rt_audio_engine.get_effect_parameters()
+
+                    await websocket.send_json({
+                        "type": "effectParameters",
+                        "parameters": params,
+                    })
+
+                elif action == "loadPreset":
+                    # Load voice effect preset
+                    preset_id = data.get("presetId")
+
+                    if preset_id:
+                        from app.realtime.voice_presets import get_preset_parameters
+
+                        params = get_preset_parameters(preset_id)
+                        rt_audio_engine.set_effect_parameters(params)
+
+                        await websocket.send_json({
+                            "type": "presetLoaded",
+                            "presetId": preset_id,
+                            "parameters": params.to_dict(),
+                        })
+
+                elif action == "getPresets":
+                    # Get list of available presets
+                    from app.realtime.voice_presets import list_presets
+
+                    presets = list_presets()
+
+                    await websocket.send_json({
+                        "type": "presets",
+                        "presets": presets,
+                    })
+
+                elif action == "playSoundboard":
+                    # Play soundboard sound (placeholder - needs soundboard integration)
+                    sound_id = data.get("soundId")
+                    loop = data.get("loop", False)
+
+                    if sound_id:
+                        logger.info(f"Soundboard: {sound_id} (loop={loop})")
+
+                        await websocket.send_json({
+                            "type": "soundboardPlayed",
+                            "soundId": sound_id,
+                        })
+
+                elif action == "stopSoundboard":
+                    # Stop soundboard playback
+                    logger.info("Soundboard stopped")
+
+                    await websocket.send_json({
+                        "type": "soundboardStopped",
+                    })
+
+                else:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Unknown action: {action}",
+                    })
+
+            except Exception as exc:
+                logger.error("Real-time control error: %s", exc)
+                await websocket.send_json({
+                    "type": "error",
+                    "message": str(exc),
+                })
+
+    except WebSocketDisconnect:
+        logger.info("Real-time control WebSocket disconnected")
+        # Stop audio processing if still running
+        if rt_audio_engine.is_processing:
+            rt_audio_engine.stop()
+    except Exception as exc:
+        logger.error("Real-time control WebSocket error: %s", exc)

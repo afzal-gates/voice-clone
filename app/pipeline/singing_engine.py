@@ -18,6 +18,7 @@ import torch
 from app.config import settings
 from app.pipeline.melody_parser import MelodyParser, PitchContour
 from app.pipeline.phoneme_converter import PhonemeConverter
+from app.pipeline.vocal_engine import VocalEngine
 
 logger = logging.getLogger(__name__)
 
@@ -37,68 +38,43 @@ class SingingEngine:
         """Initialize the singing engine with lazy model loading."""
         self._model: object | None = None
         self._vocoder: object | None = None
+        self._vocal_engine: VocalEngine | None = None
         self._device: str = "cuda" if torch.cuda.is_available() else "cpu"
         self._phoneme_converter = PhonemeConverter()
         self._melody_parser = MelodyParser()
-        self._sample_rate: int = 44100  # DiffSinger typical output rate
+        self._sample_rate: int = 24000  # XTTS/Qwen typical output rate
 
         logger.debug(
             "SingingEngine created (device=%s)", self._device
         )
 
     def _ensure_model(self, voice_model: str = "default") -> None:
-        """Load the DiffSinger model on first call.
+        """Load the VocalEngine on first call.
 
         Args:
-            voice_model: Voice model identifier to load.
+            voice_model: Voice model identifier to load (for future use).
 
         Raises:
-            RuntimeError: If DiffSinger packages are not installed or
-                          model loading fails.
+            RuntimeError: If VocalEngine initialization fails.
         """
-        if self._model is not None:
+        if self._vocal_engine is not None:
             return
 
         logger.info(
-            "Loading DiffSinger model: %s on %s", voice_model, self._device
+            "Initializing VocalEngine (XTTS v2 + Qwen3 fallback) on %s",
+            self._device
         )
 
         try:
-            # Import DiffSinger components
-            # Note: DiffSinger is not a single package but a framework
-            # This is a placeholder for actual DiffSinger integration
-            # Real implementation would use OpenUTAU/DiffSinger or similar
+            # Initialize the VocalEngine with dual TTS backend
+            self._vocal_engine = VocalEngine()
 
-            # For now, we'll create a mock placeholder that can be replaced
-            # with actual DiffSinger integration when models are available
+            logger.info("VocalEngine initialized successfully")
 
-            logger.warning(
-                "DiffSinger integration is placeholder - "
-                "actual model loading not yet implemented"
-            )
-
-            # TODO: Implement actual DiffSinger model loading
-            # This would typically involve:
-            # 1. Loading the acoustic model (DiT/transformer)
-            # 2. Loading the vocoder (NSF-HiFiGAN)
-            # 3. Loading the voice model weights
-            # 4. Setting up the inference pipeline
-
-            self._model = None  # Placeholder
-            self._vocoder = None  # Placeholder
-
-            logger.info("DiffSinger model loaded (placeholder mode)")
-
-        except ImportError as exc:
-            raise RuntimeError(
-                "DiffSinger dependencies not installed. "
-                "Required: pip install diffsinger (when available) or "
-                "use OpenUTAU with DiffSinger voicebank"
-            ) from exc
         except Exception as exc:
-            logger.error("Failed to load DiffSinger model: %s", exc)
+            logger.error("Failed to initialize VocalEngine: %s", exc)
             raise RuntimeError(
-                f"Cannot load DiffSinger model '{voice_model}': {exc}"
+                f"Cannot initialize VocalEngine: {exc}"
             ) from exc
 
     def _synthesize_core(
@@ -106,15 +82,21 @@ class SingingEngine:
         phonemes: list[str],
         pitch_contour: PitchContour,
         voice_model: str,
+        lyrics: str,
+        vocal_type: str = "ai",
+        language: str = "en",
     ) -> tuple[np.ndarray, int]:
-        """Core singing synthesis using DiffSinger.
+        """Core singing synthesis using VocalEngine (XTTS v2 + Qwen3 fallback).
 
         This is a synchronous blocking operation that runs in a thread.
 
         Args:
-            phonemes: Phoneme sequence for lyrics.
+            phonemes: Phoneme sequence for lyrics (currently unused, for future enhancement).
             pitch_contour: Pitch contour for melody.
-            voice_model: Voice model identifier.
+            voice_model: Voice model identifier (for future use).
+            lyrics: Original lyrics text.
+            vocal_type: Voice type (male, female, choir, ai).
+            language: Language code.
 
         Returns:
             Tuple of (audio_array, sample_rate).
@@ -122,29 +104,21 @@ class SingingEngine:
         self._ensure_model(voice_model)
 
         logger.info(
-            "Synthesizing singing: %d phonemes, %d notes",
-            len(phonemes),
+            "Synthesizing singing: lyrics=%d chars, %d notes, vocal_type=%s",
+            len(lyrics),
             len(pitch_contour.notes),
+            vocal_type,
         )
 
-        # TODO: Implement actual DiffSinger synthesis
-        # This would involve:
-        # 1. Align phonemes to melody timing
-        # 2. Extract F0 contour from pitch_contour
-        # 3. Run DiffSinger acoustic model
-        # 4. Run vocoder to generate audio
-        # 5. Return audio array
+        # Use VocalEngine for synthesis
+        audio, sr = self._vocal_engine.synthesize_singing(
+            lyrics=lyrics,
+            pitch_contour=pitch_contour,
+            vocal_type=vocal_type,
+            language=language,
+        )
 
-        # For now, generate mock audio
-        logger.warning("Using mock audio generation (DiffSinger not integrated)")
-
-        duration = pitch_contour.total_duration
-        if duration <= 0:
-            duration = 5.0
-
-        audio = self._generate_mock_singing(duration, pitch_contour)
-
-        return audio, self._sample_rate
+        return audio, sr
 
     def _generate_mock_singing(
         self, duration: float, pitch_contour: PitchContour
@@ -274,6 +248,7 @@ class SingingEngine:
         key_shift: int = 0,
         output_path: Path = None,
         language: str = "en",
+        vocal_type: str = "ai",
     ) -> Path:
         """Synthesize singing audio from lyrics and melody.
 
@@ -287,6 +262,7 @@ class SingingEngine:
             key_shift: Pitch shift in semitones (-12 to +12).
             output_path: Path where audio will be saved.
             language: Language code for phoneme conversion.
+            vocal_type: Voice type (male, female, choir, ai). Default: ai.
 
         Returns:
             Path to the generated audio file.
@@ -344,12 +320,15 @@ class SingingEngine:
                 "Must be MIDI path, notation string, or None"
             )
 
-        # Step 3: Synthesize singing
+        # Step 3: Synthesize singing using VocalEngine
         audio, sr = await asyncio.to_thread(
             self._synthesize_core,
             phonemes,
             pitch_contour,
             voice_model,
+            lyrics,
+            vocal_type,
+            language,
         )
 
         # Step 4: Apply key shift if requested

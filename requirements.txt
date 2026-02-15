@@ -31,6 +31,8 @@ librosa>=0.10.1
 numpy>=1.24.0
 scipy>=1.11.0
 pydub>=0.25.1
+sounddevice>=0.4.6
+pedalboard>=0.9.0
 
 # File I/O
 aiofiles>=23.2.1
@@ -42,6 +44,9 @@ safetensors>=0.4.0
 # TTS - Qwen3
 qwen-tts>=0.1.0
 
+# TTS - Coqui XTTS v2 (for singing vocals)
+TTS>=0.22.0
+
 # TTS - IndicF5 (f5-tts installed without its own deps to avoid conflicts)
 f5-tts
 vocos>=0.1.0
@@ -52,5 +57,18 @@ pypinyin>=0.50.0
 jieba>=0.42.1
 cached-path>=1.3.0
 
+# Music Generation - AudioCraft MusicGen
+audiocraft>=1.3.0
+
 # FFmpeg binary (bundled fallback when system FFmpeg is not on PATH)
 imageio-ffmpeg>=0.4.9
+
+# Video Generation
+opencv-python>=4.8.0
+matplotlib>=3.7.0
+
+# Singing Synthesis - DiffSinger Backend
+g2p-en>=2.1.0
+pretty_midi>=0.2.10
+# phonemizer>=3.2.0  # Optional: Requires espeak-ng system library
+# pyworld>=0.3.2     # Optional: Advanced pitch extraction

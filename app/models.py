@@ -56,6 +56,33 @@ class MusicStyle(str, Enum):
     CINEMATIC = "cinematic"
 
 
+class MusicGenre(str, Enum):
+    """Enhanced music genre classification for complete song generation."""
+
+    POP = "pop"
+    ROCK = "rock"
+    EDM = "edm"
+    CLASSICAL = "classical"
+    CINEMATIC = "cinematic"
+    HIPHOP = "hiphop"
+    JAZZ = "jazz"
+    COUNTRY = "country"
+    FOLK = "folk"
+    AMBIENT = "ambient"
+
+
+class MusicMood(str, Enum):
+    """Mood/emotion categories for music generation."""
+
+    HAPPY = "happy"
+    SAD = "sad"
+    DARK = "dark"
+    ROMANTIC = "romantic"
+    EPIC = "epic"
+    CALM = "calm"
+    ENERGETIC = "energetic"
+
+
 # ---------------------------------------------------------------------------
 # Domain models
 # ---------------------------------------------------------------------------
@@ -123,6 +150,7 @@ class JobInfo(BaseModel):
         created_at: UTC timestamp when the job was created.
         updated_at: UTC timestamp of the last status change.
         output_file: Path to the final output file, else ``None``.
+        metadata: Optional dictionary for storing additional job data (e.g., outputs).
     """
 
     job_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
@@ -136,6 +164,7 @@ class JobInfo(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     output_file: Optional[str] = None
+    metadata: Optional[dict] = None
 
 
 # ---------------------------------------------------------------------------
@@ -184,13 +213,21 @@ class MusicRequest(BaseModel):
 
     Attributes:
         prompt: Text description of the desired music.
-        duration: Length of generated audio in seconds (5-30s).
+        duration: Length of generated audio in seconds (5-60s).
         style: Optional genre/style preset for enhanced generation.
+        genre: Music genre for enhanced generation.
+        mood: Mood/emotion for the music.
+        bpm: Tempo in beats per minute (60-200).
+        instruments: Optional list of instruments to feature.
     """
 
     prompt: str = Field(..., min_length=1, max_length=500)
-    duration: float = Field(default=10.0, ge=5.0, le=30.0)
+    duration: float = Field(default=10.0, ge=5.0, le=60.0)
     style: Optional[MusicStyle] = None
+    genre: Optional[MusicGenre] = None
+    mood: Optional[MusicMood] = None
+    bpm: int = Field(default=120, ge=60, le=200)
+    instruments: Optional[list[str]] = None
 
 
 class MusicResponse(BaseModel):
@@ -322,6 +359,15 @@ class MelodyFormat(str, Enum):
     AUTO = "auto"
 
 
+class VocalType(str, Enum):
+    """Vocal voice types for singing synthesis."""
+
+    MALE = "male"
+    FEMALE = "female"
+    CHOIR = "choir"
+    AI = "ai"
+
+
 class SingingRequest(BaseModel):
     """Request payload for singing synthesis.
 
@@ -333,6 +379,7 @@ class SingingRequest(BaseModel):
         tempo: Tempo in BPM (60-200).
         key_shift: Pitch shift in semitones (-12 to +12).
         language: Language code for phoneme conversion.
+        vocal_type: Voice type for singing (male, female, choir, ai).
     """
 
     lyrics: str = Field(..., min_length=1, max_length=2000)
@@ -342,6 +389,7 @@ class SingingRequest(BaseModel):
     tempo: int = Field(default=120, ge=60, le=200)
     key_shift: int = Field(default=0, ge=-12, le=12)
     language: str = "en"
+    vocal_type: VocalType = VocalType.AI
 
 
 class SingingResponse(BaseModel):
@@ -358,3 +406,51 @@ class SingingResponse(BaseModel):
     status: str
     output_file: Optional[str] = None
     duration: Optional[float] = None
+
+
+class CompleteSongRequest(BaseModel):
+    """Request payload for complete AI song generation.
+
+    Attributes:
+        lyrics: Song lyrics text (10-5000 characters).
+        genre: Music genre for instrumental generation.
+        mood: Emotional mood for the music.
+        bpm: Tempo in beats per minute (60-200).
+        instruments: Optional list of instruments to feature.
+        vocal_type: Voice type for singing (male, female, choir, ai).
+        language: Language code for vocals (en, es, fr, de, etc.).
+        song_title: Song title for metadata and video. Default: "Untitled Song".
+        artist_name: Artist name for metadata and video. Default: "AI Artist".
+        generate_video: Whether to generate music video. Default: False.
+        duration: Song duration in seconds (5-60). Default: 30.
+    """
+
+    lyrics: str = Field(..., min_length=10, max_length=5000)
+    genre: MusicGenre
+    mood: MusicMood
+    bpm: int = Field(default=120, ge=60, le=200)
+    instruments: Optional[list[str]] = None
+    vocal_type: VocalType = VocalType.AI
+    language: str = Field(default="en", max_length=10)
+    song_title: str = Field(default="Untitled Song")
+    artist_name: str = Field(default="AI Artist")
+    generate_video: bool = False
+    duration: float = Field(default=30.0, ge=5.0, le=60.0)
+
+
+class CompleteSongResponse(BaseModel):
+    """Response returned after complete song generation request.
+
+    Attributes:
+        job_id: The unique job identifier.
+        status: Current generation status.
+        outputs: Dictionary mapping output types to file paths.
+        progress: Processing progress as a fraction (0.0-1.0).
+        error: Error message if generation failed.
+    """
+
+    job_id: str
+    status: JobStatus
+    outputs: Optional[dict[str, str]] = None
+    progress: float = 0.0
+    error: Optional[str] = None

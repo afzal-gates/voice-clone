@@ -117,6 +117,146 @@ class MusicEngine:
                 f"Cannot load MusicGen model '{settings.MUSICGEN_MODEL}': {exc}"
             ) from exc
 
+    def _build_enhanced_prompt(
+        self,
+        prompt: str,
+        genre: str | None = None,
+        mood: str | None = None,
+        bpm: int | None = None,
+        instruments: list[str] | None = None,
+    ) -> str:
+        """Construct detailed prompt from parameters.
+
+        Creates a comprehensive prompt by combining genre, mood, BPM, and
+        instruments into a coherent description.
+
+        Args:
+            prompt: Base text description.
+            genre: Music genre (pop, rock, edm, etc.).
+            mood: Emotional mood (happy, sad, energetic, etc.).
+            bpm: Tempo in beats per minute.
+            instruments: List of instrument names to feature.
+
+        Returns:
+            Enhanced prompt string combining all parameters.
+
+        Example:
+            >>> _build_enhanced_prompt("", "pop", "happy", 128, ["piano", "guitar"])
+            "happy pop music at 128 BPM with piano and guitar"
+        """
+        parts = []
+
+        # Add mood + genre
+        if mood and genre:
+            parts.append(f"{mood} {genre} music")
+        elif genre:
+            parts.append(f"{genre} music")
+        elif mood:
+            parts.append(f"{mood} music")
+
+        # Add BPM
+        if bpm:
+            parts.append(f"at {bpm} BPM")
+
+        # Add instruments
+        if instruments and len(instruments) > 0:
+            instruments_str = ", ".join(instruments)
+            parts.append(f"with {instruments_str}")
+
+        # Add original prompt if provided
+        if prompt:
+            parts.append(prompt)
+
+        enhanced = " ".join(parts)
+        logger.debug("Enhanced prompt: %s", enhanced)
+        return enhanced
+
+    def _crossfade_merge(self, chunks: list[np.ndarray], fade_duration: float = 2.0) -> np.ndarray:
+        """Merge audio chunks with crossfade transitions.
+
+        Args:
+            chunks: List of audio arrays to merge.
+            fade_duration: Crossfade duration in seconds.
+
+        Returns:
+            Merged audio array with smooth transitions.
+        """
+        if len(chunks) == 0:
+            return np.array([], dtype=np.float32)
+        if len(chunks) == 1:
+            return chunks[0]
+
+        fade_samples = int(fade_duration * self._sample_rate)
+        result = chunks[0]
+
+        for i in range(1, len(chunks)):
+            # Create fade out for previous chunk
+            fade_out = np.linspace(1.0, 0.0, fade_samples, dtype=np.float32)
+            # Create fade in for current chunk
+            fade_in = np.linspace(0.0, 1.0, fade_samples, dtype=np.float32)
+
+            # Apply crossfade
+            overlap_start = len(result) - fade_samples
+            result[overlap_start:] *= fade_out
+            chunks[i][:fade_samples] *= fade_in
+
+            # Combine: overlap region is summed, rest is concatenated
+            result = np.concatenate([result[:overlap_start],
+                                      result[overlap_start:] + chunks[i][:fade_samples],
+                                      chunks[i][fade_samples:]])
+
+        return result
+
+    def _generate_chunked(
+        self,
+        prompt: str,
+        total_duration: float,
+        style: str | None = None,
+        ref_audio_path: Path | None = None,
+    ) -> tuple[np.ndarray, int]:
+        """Generate audio using multiple chunks with crossfade.
+
+        For durations > 30s, splits generation into 30s chunks with 2s crossfade.
+
+        Args:
+            prompt: Enhanced prompt for generation.
+            total_duration: Total desired duration in seconds.
+            style: Optional genre/style.
+            ref_audio_path: Optional reference audio.
+
+        Returns:
+            Tuple of (merged_audio_array, sample_rate).
+        """
+        chunk_size = settings.MUSICGEN_CHUNK_SIZE
+        fade_duration = settings.MUSICGEN_CROSSFADE_DURATION
+        effective_chunk = chunk_size - fade_duration  # 28s effective per chunk
+
+        chunks = []
+        remaining_duration = total_duration
+
+        logger.info(
+            "Generating chunked music: total_duration=%.1fs, chunk_size=%.1fs",
+            total_duration,
+            chunk_size,
+        )
+
+        while remaining_duration > 0:
+            # Generate chunk (max 30s)
+            chunk_duration = min(chunk_size, remaining_duration)
+            chunk_audio, sr = self._generate_music(
+                prompt, chunk_duration, style, ref_audio_path
+            )
+            chunks.append(chunk_audio)
+
+            remaining_duration -= effective_chunk
+            logger.info("Generated chunk %d: %.1fs", len(chunks), chunk_duration)
+
+        # Merge chunks with crossfade
+        merged = self._crossfade_merge(chunks, fade_duration)
+        logger.info("Merged %d chunks: total %.1fs", len(chunks), len(merged) / self._sample_rate)
+
+        return merged, self._sample_rate
+
     def _generate_mock_music(
         self,
         prompt: str,
@@ -206,6 +346,10 @@ class MusicEngine:
         duration: float,
         style: str | None = None,
         ref_audio_path: Path | None = None,
+        genre: str | None = None,
+        mood: str | None = None,
+        bpm: int | None = None,
+        instruments: list[str] | None = None,
     ) -> tuple[np.ndarray, int]:
         """Synchronous music generation via MusicGen.
 
@@ -216,6 +360,10 @@ class MusicEngine:
             duration: Length of audio to generate in seconds.
             style: Optional genre/style for prompt enhancement.
             ref_audio_path: Optional reference audio for melody conditioning.
+            genre: Music genre for enhanced prompt building.
+            mood: Emotional mood for the music.
+            bpm: Tempo in beats per minute.
+            instruments: List of instruments to feature.
 
         Returns:
             A tuple of (audio_array, sample_rate) where audio_array is
@@ -227,16 +375,24 @@ class MusicEngine:
 
         self._ensure_model()
 
-        # Enhance prompt with style template if provided
-        enhanced_prompt = prompt
-        if style and style.lower() in STYLE_PROMPTS:
+        # Build enhanced prompt from parameters
+        if genre or mood or bpm or instruments:
+            enhanced_prompt = self._build_enhanced_prompt(
+                prompt, genre, mood, bpm, instruments
+            )
+        elif style and style.lower() in STYLE_PROMPTS:
+            # Fallback to old style templates for backward compatibility
             style_template = STYLE_PROMPTS[style.lower()]
             enhanced_prompt = f"{style_template}, {prompt}"
+        else:
+            enhanced_prompt = prompt
 
         logger.info(
-            "MusicGen generating: duration=%.1fs, style=%s, prompt='%s'",
+            "MusicGen generating: duration=%.1fs, genre=%s, mood=%s, bpm=%s, prompt='%s'",
             duration,
-            style or "none",
+            genre or "none",
+            mood or "none",
+            bpm or "none",
             enhanced_prompt[:50],
         )
 
@@ -309,19 +465,28 @@ class MusicEngine:
         duration: float = 10.0,
         style: str | None = None,
         ref_audio_path: Path | None = None,
+        genre: str | None = None,
+        mood: str | None = None,
+        bpm: int | None = None,
+        instruments: list[str] | None = None,
     ) -> Path:
         """Generate music from a text prompt.
 
         This is the main public interface for music generation. It delegates
         the blocking model inference to a worker thread to avoid blocking
-        the event loop.
+        the event loop. For durations > 30s, uses chunked generation with
+        crossfade transitions.
 
         Args:
             prompt: Text description of the desired music.
             output_path: Path where the generated audio will be saved.
-            duration: Length of audio to generate in seconds (5-30s).
+            duration: Length of audio to generate in seconds (5-60s).
             style: Optional genre/style preset for enhanced generation.
             ref_audio_path: Optional reference audio for melody conditioning.
+            genre: Music genre (pop, rock, edm, etc.) for enhanced generation.
+            mood: Emotional mood (happy, sad, energetic, etc.).
+            bpm: Tempo in beats per minute (60-200).
+            instruments: List of instrument names to feature.
 
         Returns:
             The output_path where the audio was saved.
@@ -329,20 +494,42 @@ class MusicEngine:
         Raises:
             RuntimeError: If model loading or generation fails.
         """
-        # Clamp duration to configured maximum
-        duration = max(5.0, min(settings.MUSICGEN_MAX_DURATION, duration))
+        # Clamp duration to configured maximum (now 60s)
+        duration = max(5.0, min(settings.MUSICGEN_MAX_SONG_DURATION, duration))
 
         logger.info(
-            "Generating music: prompt='%s...', duration=%.1fs, style=%s",
+            "Generating music: prompt='%s...', duration=%.1fs, genre=%s, mood=%s, bpm=%s",
             prompt[:30],
             duration,
-            style or "none",
+            genre or style or "none",
+            mood or "none",
+            bpm or "default",
         )
 
-        # Run blocking generation in worker thread
-        audio, sr = await asyncio.to_thread(
-            self._generate_music, prompt, duration, style, ref_audio_path
-        )
+        # Choose generation strategy based on duration
+        if duration > settings.MUSICGEN_CHUNK_SIZE:
+            # Use chunked generation for long durations
+            logger.info("Using chunked generation for %.1fs duration", duration)
+            audio, sr = await asyncio.to_thread(
+                self._generate_chunked,
+                self._build_enhanced_prompt(prompt, genre, mood, bpm, instruments) if (genre or mood or bpm or instruments) else prompt,
+                duration,
+                style,
+                ref_audio_path,
+            )
+        else:
+            # Use single generation for short durations
+            audio, sr = await asyncio.to_thread(
+                self._generate_music,
+                prompt,
+                duration,
+                style,
+                ref_audio_path,
+                genre,
+                mood,
+                bpm,
+                instruments,
+            )
 
         # Save to disk
         output_path.parent.mkdir(parents=True, exist_ok=True)

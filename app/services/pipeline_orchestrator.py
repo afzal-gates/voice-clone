@@ -20,6 +20,7 @@ from app.pipeline.merger import AudioMerger
 from app.pipeline.music_engine import MusicEngine
 from app.pipeline.separator import AudioSeparator
 from app.pipeline.singing_engine import SingingEngine
+from app.pipeline.song_generator import SongGenerator
 from app.pipeline.transcriber import SpeechTranscriber
 from app.pipeline.tts_engine import TTSEngine
 from app.services.job_manager import JobManager
@@ -50,6 +51,7 @@ class PipelineOrchestrator:
         self.audio_mixer = AudioMixer()
         self.aligner = AudioAligner()
         self.merger = AudioMerger()
+        self.song_generator = SongGenerator()
 
     # ------------------------------------------------------------------
     # Upload analysis pipeline
@@ -717,6 +719,92 @@ class PipelineOrchestrator:
 
         except Exception as exc:
             logger.exception("Job %s: audio mixing failed", job_id)
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.FAILED,
+                error=str(exc),
+            )
+            raise
+
+    async def process_complete_song(
+        self,
+        job_id: str,
+        lyrics: str,
+        genre: str,
+        mood: str,
+        bpm: int,
+        instruments: list[str] | None,
+        vocal_type: str,
+        language: str,
+        output_dir: Path,
+        song_title: str,
+        artist_name: str,
+        generate_video: bool,
+        duration: float,
+    ) -> dict[str, Path]:
+        """Generate complete AI song with all outputs.
+
+        Orchestrates the song generator to produce instrumentals, vocals,
+        mixed audio, MIDI, and optional video from lyrics and parameters.
+
+        Args:
+            job_id: The job identifier.
+            lyrics: Song lyrics text.
+            genre: Music genre.
+            mood: Emotional mood.
+            bpm: Tempo in BPM.
+            instruments: List of instruments.
+            vocal_type: Voice type (male, female, choir, ai).
+            language: Language code.
+            output_dir: Directory for outputs.
+            song_title: Song title.
+            artist_name: Artist name.
+            generate_video: Whether to generate video.
+            duration: Song duration in seconds.
+
+        Returns:
+            Dictionary mapping output types to file paths.
+
+        Raises:
+            Exception: Re-raised after marking the job as ``FAILED``.
+        """
+        try:
+            logger.info(
+                "Job %s: complete song generation: '%s' by %s (%s %s at %d BPM)",
+                job_id,
+                song_title,
+                artist_name,
+                mood,
+                genre,
+                bpm,
+            )
+
+            # Generate complete song
+            outputs = await self.song_generator.generate_complete_song(
+                lyrics=lyrics,
+                genre=genre,
+                mood=mood,
+                bpm=bpm,
+                instruments=instruments,
+                vocal_type=vocal_type,
+                language=language,
+                output_dir=output_dir,
+                song_title=song_title,
+                artist_name=artist_name,
+                generate_video=generate_video,
+                duration=duration,
+            )
+
+            logger.info(
+                "Job %s: complete song generation finished, %d outputs generated",
+                job_id,
+                len(outputs),
+            )
+
+            return outputs
+
+        except Exception as exc:
+            logger.exception("Job %s: complete song generation failed", job_id)
             self.job_manager.update_job(
                 job_id,
                 status=JobStatus.FAILED,

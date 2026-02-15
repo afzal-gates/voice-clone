@@ -25,6 +25,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.models import (
+    CompleteSongRequest,
+    CompleteSongResponse,
     InputType,
     JobDetailResponse,
     JobResponse,
@@ -1060,6 +1062,201 @@ async def list_singing_models() -> dict:
     """
     models = orchestrator.singing_engine.list_available_models()
     return {"models": models}
+
+
+# -- Complete Song Generation -----------------------------------------------
+
+
+@app.post("/api/music/generate-song", response_model=CompleteSongResponse)
+async def generate_complete_song(request: CompleteSongRequest) -> CompleteSongResponse:
+    """Generate complete AI song with instrumentals, vocals, and mixing.
+
+    Creates a professional song from lyrics and musical parameters, producing:
+    - Mixed song (WAV + MP3)
+    - Instrumental track (WAV + MP3)
+    - Vocal track (WAV + MP3)
+    - MIDI melody file
+    - Music video (MP4) - optional
+
+    Args:
+        request: A :class:`CompleteSongRequest` with lyrics and musical parameters.
+
+    Returns:
+        A :class:`CompleteSongResponse` with the new job_id and status.
+
+    Raises:
+        HTTPException: 400 on invalid parameters.
+    """
+    # Create job
+    job = job_manager.create_job(InputType.TEXT, f"complete_song_{request.song_title}")
+    job_dir = job_manager.get_job_dir(job.job_id)
+    output_dir = job_dir / "output"
+
+    logger.info(
+        "Complete song generation request: job=%s title='%s' artist='%s' genre=%s mood=%s bpm=%d",
+        job.job_id,
+        request.song_title,
+        request.artist_name,
+        request.genre.value,
+        request.mood.value,
+        request.bpm,
+    )
+
+    # Launch background task
+    async def process_song():
+        try:
+            outputs = await orchestrator.process_complete_song(
+                job_id=job.job_id,
+                lyrics=request.lyrics,
+                genre=request.genre.value,
+                mood=request.mood.value,
+                bpm=request.bpm,
+                instruments=request.instruments,
+                vocal_type=request.vocal_type.value,
+                language=request.language,
+                output_dir=output_dir,
+                song_title=request.song_title,
+                artist_name=request.artist_name,
+                generate_video=request.generate_video,
+                duration=request.duration,
+            )
+
+            # Convert Path objects to strings
+            outputs_str = {k: str(v) for k, v in outputs.items()}
+
+            # Update job with outputs
+            job_manager.update_job(
+                job_id=job.job_id,
+                status=JobStatus.COMPLETED,
+                progress=1.0,
+                metadata={"outputs": outputs_str},
+            )
+
+        except Exception as exc:
+            logger.error("Complete song generation failed: %s", exc)
+            job_manager.update_job(
+                job_id=job.job_id,
+                status=JobStatus.FAILED,
+                error=str(exc),
+            )
+
+    _launch_background_task(process_song())
+
+    return CompleteSongResponse(
+        job_id=job.job_id,
+        status=job.status,
+        outputs=None,
+        progress=0.0,
+        error=None,
+    )
+
+
+@app.get("/api/music/generate-song/{job_id}", response_model=CompleteSongResponse)
+async def get_complete_song_status(job_id: str) -> CompleteSongResponse:
+    """Get complete song generation job status.
+
+    Args:
+        job_id: The job identifier.
+
+    Returns:
+        A :class:`CompleteSongResponse` with current status and outputs.
+
+    Raises:
+        HTTPException: 404 if the job does not exist.
+    """
+    job = job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+
+    # Get outputs from metadata
+    outputs = None
+    if hasattr(job, "metadata") and job.metadata:
+        outputs = job.metadata.get("outputs")
+
+    return CompleteSongResponse(
+        job_id=job.job_id,
+        status=job.status,
+        outputs=outputs,
+        progress=job.progress,
+        error=job.error,
+    )
+
+
+@app.get("/api/music/generate-song/{job_id}/download/{output_type}")
+async def download_complete_song_output(job_id: str, output_type: str) -> FileResponse:
+    """Download specific output from complete song generation.
+
+    Supported output types:
+    - mixed_song_wav, mixed_song_mp3
+    - instrumental_wav, instrumental_mp3
+    - vocals_wav, vocals_mp3
+    - midi
+    - video
+
+    Args:
+        job_id: The job identifier.
+        output_type: Type of output to download.
+
+    Returns:
+        The requested file as a FileResponse.
+
+    Raises:
+        HTTPException: 404 if the job or output file not found,
+                       400 if the job is not completed.
+    """
+    job = job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+
+    if job.status != JobStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not completed. Current status: {job.status.value}",
+        )
+
+    # Get outputs from metadata
+    if not hasattr(job, "metadata") or not job.metadata:
+        raise HTTPException(
+            status_code=404,
+            detail="No outputs available for this job.",
+        )
+
+    outputs = job.metadata.get("outputs", {})
+    if output_type not in outputs:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Output type '{output_type}' not found. Available: {list(outputs.keys())}",
+        )
+
+    file_path = Path(outputs[output_type])
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Output file not found: {file_path.name}",
+        )
+
+    # Determine media type
+    suffix = file_path.suffix.lower()
+    media_type_map = {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".mid": "audio/midi",
+        ".mp4": "video/mp4",
+    }
+    media_type = media_type_map.get(suffix, "application/octet-stream")
+
+    logger.info(
+        "Download complete song output: job=%s type=%s file=%s",
+        job_id,
+        output_type,
+        file_path.name,
+    )
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=file_path.name,
+    )
 
 
 # -- Download --------------------------------------------------------------

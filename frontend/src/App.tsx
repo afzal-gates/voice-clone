@@ -14,6 +14,7 @@ import { Music } from '@/features/music/Music';
 import { RealtimeVoiceChanger } from '@/features/realtime/RealtimeVoiceChanger';
 import { AudioMixer } from '@/features/mixer/AudioMixer';
 import { Singing } from '@/features/singing/Singing';
+import { SongGenerator } from '@/features/song-generator/SongGenerator';
 import { Sidebar } from '@/features/sidebar/Sidebar';
 import { Settings } from '@/features/settings/Settings';
 import { useUIStore } from '@/store/uiStore';
@@ -35,6 +36,7 @@ function App() {
     { id: 'music', label: 'Music Generation' },
     { id: 'mixer', label: 'Audio Mixer' },
     { id: 'singing', label: 'Singing Synthesis' },
+    { id: 'song-generator', label: 'Song Generator' },
     { id: 'realtime', label: 'Voice Changer' },
   ];
 
@@ -69,6 +71,7 @@ function App() {
             {getCurrentTabId() === 'music' && <Music />}
             {getCurrentTabId() === 'mixer' && <AudioMixer />}
             {getCurrentTabId() === 'singing' && <Singing />}
+            {getCurrentTabId() === 'song-generator' && <SongGenerator />}
             {getCurrentTabId() === 'realtime' && <RealtimeVoiceChanger />}
           </main>
         </div>

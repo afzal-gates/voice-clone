@@ -86,6 +86,9 @@ class Settings:
         self.MUSICGEN_USE_GPU: bool = os.getenv("MUSICGEN_USE_GPU", "true").lower() in ("true", "1", "yes")
         self.MUSICGEN_MAX_DURATION: float = float(os.getenv("MUSICGEN_MAX_DURATION", "30.0"))
         self.MUSICGEN_MOCK_MODE: bool = os.getenv("MUSICGEN_MOCK_MODE", "true").lower() in ("true", "1", "yes")
+        self.MUSICGEN_MAX_SONG_DURATION: float = float(os.getenv("MUSICGEN_MAX_SONG_DURATION", "60.0"))
+        self.MUSICGEN_CHUNK_SIZE: float = float(os.getenv("MUSICGEN_CHUNK_SIZE", "30.0"))
+        self.MUSICGEN_CROSSFADE_DURATION: float = float(os.getenv("MUSICGEN_CROSSFADE_DURATION", "2.0"))
 
         # --- Diarization ---
         self.PYANNOTE_MODEL: str = os.getenv(

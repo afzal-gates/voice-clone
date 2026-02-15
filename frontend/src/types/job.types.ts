@@ -16,7 +16,8 @@ export type JobStatus = typeof JobStatus[keyof typeof JobStatus];
 
 export const InputType = {
   AUDIO: 'audio',
-  VIDEO: 'video'
+  VIDEO: 'video',
+  TEXT: 'text'
 } as const;
 
 export type InputType = typeof InputType[keyof typeof InputType];

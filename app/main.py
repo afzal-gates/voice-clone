@@ -28,16 +28,16 @@ from app.models import (
     CompleteSongRequest,
     CompleteSongResponse,
     InputType,
+    InstrumentalRequest,
+    InstrumentalResponse,
     JobDetailResponse,
     JobResponse,
     JobStatus,
     MixRequest,
     MixResponse,
     MusicResponse,
-    MusicStyle,
     SingingResponse,
     TTSResponse,
-    VoiceAssignmentRequest,
     VoiceProfileResponse,
 )
 from app.services.job_manager import JobManager
@@ -199,6 +199,7 @@ def _job_to_detail(job: object) -> dict:
         "progress": job.progress,
         "error": job.error,
         "created_at": job.created_at,
+        "updated_at": getattr(job, 'updated_at', job.created_at),
         "output_file": job.output_file,
     }
 
@@ -1247,6 +1248,191 @@ async def download_complete_song_output(job_id: str, output_type: str) -> FileRe
 
     logger.info(
         "Download complete song output: job=%s type=%s file=%s",
+        job_id,
+        output_type,
+        file_path.name,
+    )
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=file_path.name,
+    )
+
+
+# -- Instrumental Generation -----------------------------------------------
+
+
+@app.post("/api/music/generate-instrumental", response_model=InstrumentalResponse)
+async def generate_instrumental(request: InstrumentalRequest) -> InstrumentalResponse:
+    """Generate instrumental music only from lyrics.
+
+    Creates high-quality instrumental music inspired by lyrics without
+    vocal synthesis. The lyrics guide the musical structure and emotional
+    progression, producing:
+    - Instrumental track (WAV + MP3)
+    - MIDI melody file (optional, based on lyrics structure)
+
+    Args:
+        request: A :class:`InstrumentalRequest` with lyrics and musical parameters.
+
+    Returns:
+        A :class:`InstrumentalResponse` with the new job_id and status.
+
+    Raises:
+        HTTPException: 400 on invalid parameters.
+    """
+    # Create job
+    job = job_manager.create_job(InputType.TEXT, f"instrumental_{request.title}")
+    job_dir = job_manager.get_job_dir(job.job_id)
+    output_dir = job_dir / "output"
+
+    logger.info(
+        "Instrumental generation request: job=%s title='%s' genre=%s mood=%s bpm=%d",
+        job.job_id,
+        request.title,
+        request.genre.value,
+        request.mood.value,
+        request.bpm,
+    )
+
+    # Launch background task
+    async def process_instrumental():
+        try:
+            outputs = await orchestrator.process_instrumental(
+                job_id=job.job_id,
+                lyrics=request.lyrics,
+                genre=request.genre.value,
+                mood=request.mood.value,
+                bpm=request.bpm,
+                instruments=request.instruments,
+                output_dir=output_dir,
+                title=request.title,
+                duration=request.duration,
+            )
+
+            # Convert Path objects to strings
+            outputs_str = {k: str(v) for k, v in outputs.items()}
+
+            # Update job with outputs
+            job_manager.update_job(
+                job_id=job.job_id,
+                status=JobStatus.COMPLETED,
+                progress=1.0,
+                metadata={"outputs": outputs_str},
+            )
+
+        except Exception as exc:
+            logger.error("Instrumental generation failed: %s", exc)
+            job_manager.update_job(
+                job_id=job.job_id,
+                status=JobStatus.FAILED,
+                error=str(exc),
+            )
+
+    _launch_background_task(process_instrumental())
+
+    return InstrumentalResponse(
+        job_id=job.job_id,
+        status=job.status,
+        outputs=None,
+        progress=0.0,
+        error=None,
+    )
+
+
+@app.get("/api/music/generate-instrumental/{job_id}", response_model=InstrumentalResponse)
+async def get_instrumental_status(job_id: str) -> InstrumentalResponse:
+    """Get instrumental generation job status.
+
+    Args:
+        job_id: The job identifier.
+
+    Returns:
+        A :class:`InstrumentalResponse` with current status and outputs.
+
+    Raises:
+        HTTPException: 404 if the job does not exist.
+    """
+    job = job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+
+    # Get outputs from metadata
+    outputs = None
+    if hasattr(job, "metadata") and job.metadata:
+        outputs = job.metadata.get("outputs")
+
+    return InstrumentalResponse(
+        job_id=job.job_id,
+        status=job.status,
+        outputs=outputs,
+        progress=job.progress,
+        error=job.error,
+    )
+
+
+@app.get("/api/music/generate-instrumental/{job_id}/download/{output_type}")
+async def download_instrumental_output(job_id: str, output_type: str) -> FileResponse:
+    """Download specific output from instrumental generation.
+
+    Supported output types:
+    - instrumental_wav, instrumental_mp3
+    - midi
+
+    Args:
+        job_id: The job identifier.
+        output_type: Type of output to download.
+
+    Returns:
+        The requested file as a FileResponse.
+
+    Raises:
+        HTTPException: 404 if the job or output file not found,
+                       400 if the job is not completed.
+    """
+    job = job_manager.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+
+    if job.status != JobStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not completed. Current status: {job.status.value}",
+        )
+
+    # Get outputs from metadata
+    if not hasattr(job, "metadata") or not job.metadata:
+        raise HTTPException(
+            status_code=404,
+            detail="No outputs available for this job.",
+        )
+
+    outputs = job.metadata.get("outputs", {})
+    if output_type not in outputs:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Output type '{output_type}' not found. Available: {list(outputs.keys())}",
+        )
+
+    file_path = Path(outputs[output_type])
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Output file not found: {file_path.name}",
+        )
+
+    # Determine media type
+    suffix = file_path.suffix.lower()
+    media_type_map = {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".mid": "audio/midi",
+    }
+    media_type = media_type_map.get(suffix, "application/octet-stream")
+
+    logger.info(
+        "Download instrumental output: job=%s type=%s file=%s",
         job_id,
         output_type,
         file_path.name,

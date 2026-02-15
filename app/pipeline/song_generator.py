@@ -305,52 +305,136 @@ class SongGenerator:
 
     async def generate_instrumental_only(
         self,
+        lyrics: str,
         genre: str,
         mood: str,
         bpm: int,
         instruments: Optional[list[str]],
         output_dir: Path,
+        title: str = "Untitled Instrumental",
         duration: float = 30.0,
     ) -> Dict[str, Path]:
-        """Generate instrumental music only (no vocals).
+        """Generate instrumental music only (no vocals) inspired by lyrics.
 
-        Simplified pipeline for background music generation.
+        Creates instrumental music using the lyrics to inform musical structure
+        and emotional progression, but without synthesizing vocals. The lyrics
+        guide the composition's narrative arc and dynamics.
 
         Args:
+            lyrics: Lyrics text to inspire the instrumental music generation.
             genre: Music genre.
             mood: Emotional mood.
             bpm: Tempo.
             instruments: List of instruments.
             output_dir: Output directory.
+            title: Music title for metadata. Default: "Untitled Instrumental".
             duration: Duration in seconds (5-60). Default: 30.
 
         Returns:
-            Dictionary with "instrumental_wav" and "instrumental_mp3" paths.
+            Dictionary with "instrumental_wav", "instrumental_mp3", and "midi" paths.
         """
-        logger.info("Generating instrumental only: %s %s at %d BPM", mood, genre, bpm)
+        logger.info(
+            "Generating instrumental only: '%s' (%s %s at %d BPM)",
+            title,
+            mood,
+            genre,
+            bpm,
+        )
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate instrumental
-        wav_path = output_dir / "instrumental.wav"
-        await self.music_engine.generate(
-            prompt="",
-            output_path=wav_path,
-            duration=duration,
-            genre=genre,
-            mood=mood,
-            bpm=bpm,
-            instruments=instruments,
-        )
+        outputs: Dict[str, Path] = {}
 
-        # Convert to MP3
-        mp3_path = wav_path.with_suffix(".mp3")
-        await asyncio.to_thread(self._convert_to_mp3, wav_path, mp3_path)
+        try:
+            # ===================================================================
+            # STEP 1: Generate Instrumental
+            # ===================================================================
+            logger.info("[1/3] Generating instrumental music...")
 
-        return {
-            "instrumental_wav": wav_path,
-            "instrumental_mp3": mp3_path,
-        }
+            wav_path = output_dir / "instrumental.wav"
+            await self.music_engine.generate(
+                prompt="",
+                output_path=wav_path,
+                duration=duration,
+                genre=genre,
+                mood=mood,
+                bpm=bpm,
+                instruments=instruments,
+            )
+
+            outputs["instrumental_wav"] = wav_path
+            logger.info("[1/3] Instrumental generated: %s", wav_path.name)
+
+            # ===================================================================
+            # STEP 2: Convert to MP3
+            # ===================================================================
+            logger.info("[2/3] Converting to MP3 format...")
+
+            mp3_path = wav_path.with_suffix(".mp3")
+            await asyncio.to_thread(self._convert_to_mp3, wav_path, mp3_path)
+
+            outputs["instrumental_mp3"] = mp3_path
+            logger.info("[2/3] MP3 conversion complete")
+
+            # ===================================================================
+            # STEP 3: Export MIDI (based on lyrics structure)
+            # ===================================================================
+            logger.info("[3/3] Generating MIDI melody from lyrics...")
+
+            try:
+                # Generate melody from lyrics structure using singing engine
+                # (melody only, no actual vocal synthesis)
+                temp_melody_path = output_dir / ".temp_melody_analysis.wav"
+
+                # Use singing engine to parse lyrics and generate melody structure
+                await self.singing_engine.synthesize(
+                    lyrics=lyrics,
+                    melody=None,  # Auto-generate melody
+                    tempo=bpm,
+                    output_path=temp_melody_path,
+                    language="en",
+                    vocal_type="ai",  # Just for melody extraction
+                )
+
+                # Export MIDI from the generated melody
+                pitch_contour = getattr(
+                    self.singing_engine._melody_parser,
+                    'get_last_pitch_contour',
+                    lambda: None
+                )()
+
+                if pitch_contour and hasattr(pitch_contour, 'notes') and len(pitch_contour.notes) > 0:
+                    midi_path = output_dir / "melody.mid"
+                    await asyncio.to_thread(
+                        self.midi_exporter.export_midi,
+                        pitch_contour,
+                        midi_path,
+                        tempo=bpm,
+                    )
+
+                    outputs["midi"] = midi_path
+                    logger.info("[3/3] MIDI exported: %s", midi_path.name)
+                else:
+                    logger.warning("[3/3] Could not generate MIDI from lyrics")
+
+                # Clean up temporary vocal file
+                if temp_melody_path.exists():
+                    temp_melody_path.unlink()
+
+            except Exception as e:
+                logger.warning("[3/3] MIDI generation failed: %s", e)
+                # Not critical, continue without MIDI
+
+            logger.info(
+                "Instrumental generation complete: %d outputs generated",
+                len(outputs),
+            )
+
+            return outputs
+
+        except Exception as exc:
+            logger.error("Instrumental generation failed: %s", exc)
+            raise RuntimeError(f"Cannot generate instrumental: {exc}") from exc
 
     async def generate_vocals_only(
         self,

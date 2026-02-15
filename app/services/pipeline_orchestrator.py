@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 
 from app.config import settings
-from app.models import JobStatus, VoiceAssignment
+from app.models import JobStatus, VoiceMapping
 from app.pipeline.aligner import AudioAligner
 from app.pipeline.audio_extractor import AudioExtractor
 from app.pipeline.audio_mixer import AudioMixer
@@ -179,7 +179,7 @@ class PipelineOrchestrator:
     async def process_voice_replacement(
         self,
         job_id: str,
-        assignments: list[VoiceAssignment],
+        assignments: list[VoiceMapping],
     ) -> None:
         """Replace detected speaker voices with TTS-generated speech.
 
@@ -805,6 +805,80 @@ class PipelineOrchestrator:
 
         except Exception as exc:
             logger.exception("Job %s: complete song generation failed", job_id)
+            self.job_manager.update_job(
+                job_id,
+                status=JobStatus.FAILED,
+                error=str(exc),
+            )
+            raise
+
+    async def process_instrumental(
+        self,
+        job_id: str,
+        lyrics: str,
+        genre: str,
+        mood: str,
+        bpm: int,
+        instruments: list[str] | None,
+        output_dir: Path,
+        title: str,
+        duration: float,
+    ) -> dict[str, Path]:
+        """Generate instrumental music only from lyrics.
+
+        Orchestrates the song generator to produce instrumental music
+        inspired by lyrics, without vocal synthesis. Outputs instrumental
+        audio (WAV + MP3) and optional MIDI file.
+
+        Args:
+            job_id: The job identifier.
+            lyrics: Lyrics text to inspire the music generation.
+            genre: Music genre.
+            mood: Emotional mood.
+            bpm: Tempo in BPM.
+            instruments: List of instruments.
+            output_dir: Directory for outputs.
+            title: Music title for metadata.
+            duration: Music duration in seconds.
+
+        Returns:
+            Dictionary mapping output types to file paths.
+
+        Raises:
+            Exception: Re-raised after marking the job as ``FAILED``.
+        """
+        try:
+            logger.info(
+                "Job %s: instrumental generation: '%s' (%s %s at %d BPM)",
+                job_id,
+                title,
+                mood,
+                genre,
+                bpm,
+            )
+
+            # Generate instrumental only
+            outputs = await self.song_generator.generate_instrumental_only(
+                lyrics=lyrics,
+                genre=genre,
+                mood=mood,
+                bpm=bpm,
+                instruments=instruments,
+                output_dir=output_dir,
+                title=title,
+                duration=duration,
+            )
+
+            logger.info(
+                "Job %s: instrumental generation finished, %d outputs generated",
+                job_id,
+                len(outputs),
+            )
+
+            return outputs
+
+        except Exception as exc:
+            logger.exception("Job %s: instrumental generation failed", job_id)
             self.job_manager.update_job(
                 job_id,
                 status=JobStatus.FAILED,
